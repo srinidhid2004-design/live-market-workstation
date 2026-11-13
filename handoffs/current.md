@@ -2,13 +2,15 @@
 
 ## Checkpoint
 
+Prompt 07 adds provider-independent one-minute UTC candle calculation over the SQLite recorder's current versions. The constructed AAPL fixture returned O/H/L/C/V `100/103/100/101/11` before and at completion, and again after the late observation. All 41 backend tests passed with the process-local asyncio runner. `pip check`, frontend ESLint, and the production build passed. See the [Prompt 07 results](../docs/verification.md#prompt-07---one-minute-candles).
+
 Prompt 06 adds the SQLite observation recorder and an adapter for decoded Yahoo messages. The ignored runtime path is `backend/data/observations.sqlite3`. Use `.\.venv\Scripts\python.exe -B -m app.observations` from `backend/` to initialize it. Constructed inputs verified repeat suppression, revision retention, and persistence after reopening in a fresh Python backend process. All 24 backend tests passed, as did `pip check`, frontend lint, and the production build. See [Prompt 06 verification](../docs/verification.md#prompt-06---sqlite-observation-recorder).
 
 Prompt 05's normal-PowerShell installation is complete. All 36 pins match `backend/.venv`, including yfinance 1.8.0 and websockets 17.4. The WebSocket import and `pip check` passed. The restricted project shell failed Yahoo hostname resolution with Windows error 11001. The separately authorized normal-PowerShell probe resolved DNS, opened the Yahoo Finance WebSocket, and subscribed only to AAPL. It timed out within the 25-second bound without a qualifying update or a retry. Price, source and receipt times, and volume were unobserved. Live receipt remains unverified. See the [bounded check evidence](../docs/verification.md#prompt-05---bounded-aapl-check).
 
 Final verification passed all 12 backend tests with the process-local asyncio runner, frontend ESLint with zero warnings, and the production build. Ports 8000 and 5173 were free and the Yahoo probe had exited. The virtual environment and generated artifacts remain ignored and untracked.
 
-Prompt 06 started at `0fe1358` on `feature/assignment-4-part-1`, with `main` at `474573e`, an empty index, and no remote. Prompts 2 and 3 were verified and committed at `0954655` and `c683818`. Prompt 4's committed chart uses the synthetic CSV. Its isolated Chrome favicon check, lint, and build passed. The complete post-fix running-app SmokeTest still needs normal PowerShell with loopback access. See the [Prompt 4 verification](../docs/verification.md#prompt-4-autoloop---favicon-console-error).
+Prompt 07 started at `54da86d` on `feature/assignment-4-part-1`, with `main` at `474573e`, a clean worktree, an empty index, and no remote. Prompts 2 and 3 were verified and committed at `0954655` and `c683818`. Prompt 4's committed chart uses the synthetic CSV. Its isolated Chrome favicon check, lint, and build passed. The complete post-fix running-app SmokeTest still needs normal PowerShell with loopback access. See the [Prompt 4 verification](../docs/verification.md#prompt-4-autoloop---favicon-console-error).
 
 ## Foundation files and checks
 
@@ -22,8 +24,8 @@ Prompt 06 started at `0fe1358` on `feature/assignment-4-part-1`, with `main` at 
 
 ## Outstanding decisions and next task
 
-- Obtain separate approval for an AAPL receipt check during active market conditions to collect final Assignment 4.1 evidence. The decoder adapter is available for the future live receiver. Candle aggregation, market-data WebSockets, and replay remain pending.
-- Later design decisions include the candle interval and completion rule, stale-data threshold, provider volume mapping, and replay order and pacing. Keep the course disclosure current as tools or models change.
+- Obtain separate approval for an AAPL receipt check during active market conditions to collect final Assignment 4.1 evidence. The decoder adapter and candle calculation are available for the future live pipeline. Application WebSockets, frontend live updates, and replay remain pending.
+- Later design decisions include the stale-data threshold, live provider volume mapping, and replay order and pacing. Keep the course disclosure current as tools or models change.
 
 ## Prompt 2A connectivity retry
 

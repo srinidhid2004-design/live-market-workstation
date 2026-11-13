@@ -454,3 +454,25 @@ After the writer exited, a fresh Python backend process reopened the same dispos
 | 2 | 101.0 | `2026-11-09T14:30:04.000000Z` | 1 | `{"currency":"USD","test_revision":2}` | `5de297c499d635d61c6197a1d836c849175124496fcae41e9a084b2ab7bfce9b` |
 
 Historical reads retained the earlier price. The repeat returned ID 1 without creating a countable row or changing its receipt time. The current-only read returned ID 2. The writer and reader used separate Python processes without starting the HTTP service. The disposable database and its directory were removed afterward.
+
+## Prompt 07 - One-minute candles
+
+Preflight found a clean `feature/assignment-4-part-1` at `54da86d`, `main` at `474573e81efca7b4921cd602f4dee7803f804f36`, an empty index, and no remote. The checkpoint used constructed observations in disposable SQLite databases, without a Yahoo request or access to the default runtime database.
+
+The instructor fixture for November 9, 2026 used a 14:59:59 UTC baseline of 1000 and three in-minute cumulative totals of 1004, 1009, and 1011. The 15:00 UTC candle volume was `1011 - 1000 = 11`.
+
+| Constructed scenario | UTC evaluation time | Expected O/H/L/C/V and completion | Observed |
+| --- | --- | --- | --- |
+| All observations before the boundary | `15:00:59.999999` | `100/103/100/101/11`, false | Matched |
+| All observations at the boundary | `15:01:00` | `100/103/100/101/11`, true | Matched |
+| 15:00:20 observation still pending | `15:01:00` | `100/101/100/101/11`, true | Matched |
+| 15:00:20 observation delivered late | `15:01:01` | `100/103/100/101/11`, true | Matched |
+
+Each scenario checked timestamp `2026-11-09T15:00:00Z`, the exact six market-data keys, and separate `is_complete`. A verified correction changed price 103 to 98, giving high 101 and low 98 while the original 103 remained available in historical reads. A separate test moved a corrected observation across a minute boundary and confirmed the old empty candle disappeared.
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| Complete backend unittest discovery from `backend/` | Pass candle, recorder, health, and synthetic history tests | All 41 tests passed in 1.965 seconds using the process-local asyncio test runner documented in Prompt 05. The 17 candle tests cover the fixture, late arrival, revisions, duplicate exclusion, equal-time ordering, missing and invalid volume, resets, zero volume, empty minutes, source and ticker isolation, and UTC boundaries. |
+| `.\backend\.venv\Scripts\python.exe -B -m pip --disable-pip-version-check check` | No broken requirements | Passed. No dependency was added or changed. |
+| `npm.cmd --prefix frontend run lint` and `npm.cmd --prefix frontend run build` | Zero ESLint warnings and a successful production bundle | Both passed. Vite 7.3.8 transformed 19 modules. |
+| Git, credential, private-path, generated-file, and runtime-database checks | No whitespace errors, credential or private-path matches, or tracked generated files | Passed, including whitespace checks on new files. The disposable databases were removed and no runtime database or sidecars remained. Ports 8000 and 5173 had no listeners. |

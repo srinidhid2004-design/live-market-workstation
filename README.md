@@ -99,6 +99,14 @@ The command initializes the ignored `backend/data/observations.sqlite3` file wit
 
 The `observations` table stores an immutable ID that doubles as receipt order, source and ticker, original integer source time and unit, normalized source and receipt UTC times, price, volume fields, decoded source evidence, a unique content fingerprint, and optional verified event and revision IDs. `ObservationStore.read()` returns all unique versions. `read(current_only=True)` keeps independent observations and the latest stored version in each verified chain. Both support `order="source"` for source-time order. The Yahoo adapter accepts already-decoded messages. Prompt 06 used constructed inputs and disposable databases. See the [identity policy](docs/design-pipeline.md#prompt-06-observation-identity-and-revisions) and [restart evidence](docs/verification.md#prompt-06---sqlite-observation-recorder).
 
+### Form one-minute candles from observations
+
+`app.candles.form_candles()` reads current versions for one source and ticker. It groups observations by UTC source minute, including the minute start and excluding the next boundary. Prices are ordered by source time and then by immutable observation ID, which is the recorder's receipt order. Empty minutes produce no candle. Recalculating after a late observation or a verified correction uses the updated snapshot. Earlier observation versions remain in the recorder for audit.
+
+Each candle has exactly six market-data fields in `data` (`timestamp`, `open`, `high`, `low`, `close`, `volume`) and a separate `is_complete`. The caller supplies a UTC evaluation time. Completion begins at the next minute boundary and does not prevent a later recalculation from changing OHLCV.
+
+For a field explicitly identified as a cumulative session total, volume is the last valid total in the minute minus the most recent valid total strictly before the minute. A missing or invalid in-minute value, missing baseline, or observed decrease yields `None` (JSON `null`). A known zero is `0`. The constructed fixture uses `day_volume` for this calculation. Yahoo's live volume semantics remain unverified. The Python logic is available for future integration, and `/api/history` continues to serve the synthetic CSV. See the [Prompt 07 checks](docs/verification.md#prompt-07---one-minute-candles).
+
 ## Project map
 
 | Path | Contents |
@@ -107,7 +115,7 @@ The `observations` table stores an immutable ID that doubles as receipt order, s
 | `AGENTS.md` | Standing project instructions |
 | `.gitignore` | Local environment, dependency, build, and runtime exclusions |
 | `AI-USE.md` | Course disclosure of development tools and application AI status |
-| `backend/` | FastAPI health and synthetic history routes, SQLite recorder and Yahoo message adapter, backend tests, dependency lock, and ignored local runtime files |
+| `backend/` | FastAPI health and synthetic history routes, SQLite recorder, Yahoo message adapter, one-minute candle calculation, backend tests, dependency lock, and ignored local runtime files |
 | `frontend/` | Vue connection interface and synthetic candlestick chart, Vite proxy, pinned manifest, and Chrome SmokeTest |
 | `docs/design-pipeline.md` | Planned data flow and evidence requirements |
 | `docs/verification.md` | Commands, expected results, and observed results |
