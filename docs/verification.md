@@ -420,3 +420,37 @@ DNS resolution for `streamer.finance.yahoo.com` succeeded and the Yahoo Finance 
 | `npm.cmd --prefix frontend run build` | Vite 7.3.8 built the production bundle and transformed 19 modules. |
 | Process and TCP cleanup | `Get-Process` found no running Python or Node processes. `netstat.exe -ano -p tcp` found no project listeners on 8000 or 5173 and no remaining probe connection. |
 | `git check-ignore` and `git ls-files` | The virtual environment, dependencies, caches, build output, and local test artifacts remain ignored and untracked. |
+
+## Prompt 06 - SQLite observation recorder
+
+Preflight found a clean `feature/assignment-4-part-1` at `0fe1358`, `main` at `474573e81efca7b4921cd602f4dee7803f804f36`, an empty index, and no remote. The identity and revision policy was documented before implementation. The existing Python 3.14.7 environment provided SQLite 3.50.4. The checks used constructed data and made no Yahoo connection.
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| `python -B -m app.observations --db <disposable-path>` twice using `backend/.venv` | Create schema version 1 and reopen it idempotently | Both processes reported `Observation database ready (schema version 1).` The test suite also verified unchanged bytes on reopen. |
+| Recorder unittest discovery from `backend/` with `-p test_observations.py -v` | Verify schema version, foreign keys, deduplication, revisions, source and receipt ordering, persistence, unsupported-version refusal, invalid-input rollback, and the Yahoo adapter | All 12 tests passed in 0.402 seconds. Foreign keys were enabled on each tested connection. The invalid write rolled back and a subsequent write succeeded. |
+| Complete backend unittest discovery from `backend/` | Pass the recorder tests and existing health and synthetic-history checks | All 24 tests passed in 0.622 seconds using the process-local asyncio test runner documented in Prompt 05. The runner substitutes polling for the restricted Windows shell's TCP wakeup socket. |
+| Installed yfinance descriptor comparison | Match the adapter allowlist to the pinned release | The adapter covers all 33 decoded `PricingData` field names. |
+| `.\backend\.venv\Scripts\python.exe -B -m pip --disable-pip-version-check check` | No broken requirements | Passed. No dependency was added or changed. |
+| `npm.cmd --prefix frontend run lint` and `npm.cmd --prefix frontend run build` | Zero ESLint warnings and a successful production bundle | Both passed. Vite 7.3.8 transformed 19 modules. |
+| `git diff --check`, whitespace check for new files, and credential and private-path scans | No whitespace errors, credential-pattern matches, or private absolute paths in the changes | Passed. |
+| Runtime, ignore, and listener checks | No database or sidecars remain. Runtime paths are ignored and project ports are free. | Passed. Git ignores the default database path and its sidecars, the virtual environment, dependencies, and build output. Ports 8000 and 5173 had no listeners. |
+
+### Constructed observation and restart demonstration
+
+A Python backend writer process submitted the following three inputs in order. All were labeled `constructed_test`. Each used ticker `AAPL`, test event ID `constructed-event-1`, and source timestamp `1794234600123` ms (`2026-11-09T14:30:00.123000Z`). The test source supplied `day_volume` as `"5000"` and `last_size` as `0` without assigning volume semantics.
+
+| Input | Receipt time (UTC) | Price | Returned ID | Inserted | Stored rows |
+| --- | --- | ---: | ---: | --- | ---: |
+| First observation | 14:30:02 | 100.0 | 1 | Yes | 1 |
+| Exact repeat | 14:30:03 | 100.0 | 1 | No | 1 |
+| Verified revision | 14:30:04 | 101.0 | 2 | Yes | 2 |
+
+After the writer exited, a fresh Python backend process reopened the same disposable database and read these rows in receipt order:
+
+| Observation ID | Price | Receipt time (UTC) | Revises | Selected source evidence | Fingerprint |
+| ---: | ---: | --- | ---: | --- | --- |
+| 1 | 100.0 | `2026-11-09T14:30:02.000000Z` | — | `{"currency":"USD","test_revision":1}` | `90867022bb70ed97c5b5ff5af00225fb6c42d4485d9251cdf6553b9a076d652c` |
+| 2 | 101.0 | `2026-11-09T14:30:04.000000Z` | 1 | `{"currency":"USD","test_revision":2}` | `5de297c499d635d61c6197a1d836c849175124496fcae41e9a084b2ab7bfce9b` |
+
+Historical reads retained the earlier price. The repeat returned ID 1 without creating a countable row or changing its receipt time. The current-only read returned ID 2. The writer and reader used separate Python processes without starting the HTTP service. The disposable database and its directory were removed afterward.

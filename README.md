@@ -21,7 +21,7 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | Local shell | Windows and PowerShell | Windows x64, build 26300, PowerShell 7.6.9 |
 | Backend | Python with type hints | Python 3.14.7 runs directly. The Windows `python` and `py` aliases failed in the project shell. |
 | API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | FastAPI 0.162.5 and Uvicorn 0.54.0 import in the local environment. The implemented HTTP routes are `/api/health` and `/api/history`. |
-| Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed an in-memory write/read check. |
+| Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed the Prompt 06 recorder and restart checks with constructed observations. |
 | Market feed | Yahoo Finance via yfinance | `yfinance==1.8.0` and `websockets==17.4` import in `backend/.venv`. The normal-PowerShell AAPL probe resolved DNS and opened the WebSocket. It timed out after 25 seconds without a qualifying update. |
 | Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The Vue, Vite, and Lightweight Charts 5.3.0 pins are in `frontend/package.json`. |
 | Package tools | pip for Python and npm for the frontend | pip 26.2.1 runs in the existing environment. The student completed the npm install from the official registry in normal PowerShell. The 36-pin Python lock was checked against the approved resolution. |
@@ -85,7 +85,19 @@ Prompt 3 verification passed in normal PowerShell. All 12 backend tests passed, 
 
 Start the backend and frontend with the commands above and open `http://127.0.0.1:5173/`. The chart loads `/api/history` and draws a candle and aligned volume bar for each UTC minute. Hover over a candle or use **Inspect candle (UTC)** to see its date, time, OHLC prices, and volume. The expected close at 14:31 UTC on November 9, 2026 is **101**, with volume of **850 shares**.
 
-From the project root in normal PowerShell, run `npm.cmd --prefix .\frontend run test:connection` with ports 8000 and 5173 free. The test starts both services and checks the chart and connection behavior in installed Chrome. The chart passed an offline Chrome check with the synthetic fixture. The running-app SmokeTest still needs a shell with loopback access. Live Yahoo Finance ingestion, SQLite persistence, market-data WebSockets, and replay remain future work.
+From the project root in normal PowerShell, run `npm.cmd --prefix .\frontend run test:connection` with ports 8000 and 5173 free. The test starts both services and checks the chart and connection behavior in installed Chrome. The chart passed an offline Chrome check with the synthetic fixture. The running-app SmokeTest still needs a shell with loopback access. Live ingestion, market-data WebSockets, and replay remain future work.
+
+### Initialize the local observation database
+
+From `backend/`, run:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m app.observations
+```
+
+The command initializes the ignored `backend/data/observations.sqlite3` file with `PRAGMA user_version = 1`. A clean checkout contains no database. After the Python environment is set up, the command creates an empty schema on first use. Running it again preserves the data. An unsupported schema version raises an error. Pass `--db <path>` to use another database in an existing directory. The HTTP backend can still start on a clean checkout and serve health and synthetic history without this initialization.
+
+The `observations` table stores an immutable ID that doubles as receipt order, source and ticker, original integer source time and unit, normalized source and receipt UTC times, price, volume fields, decoded source evidence, a unique content fingerprint, and optional verified event and revision IDs. `ObservationStore.read()` returns all unique versions. `read(current_only=True)` keeps independent observations and the latest stored version in each verified chain. Both support `order="source"` for source-time order. The Yahoo adapter accepts already-decoded messages. Prompt 06 used constructed inputs and disposable databases. See the [identity policy](docs/design-pipeline.md#prompt-06-observation-identity-and-revisions) and [restart evidence](docs/verification.md#prompt-06---sqlite-observation-recorder).
 
 ## Project map
 
@@ -95,7 +107,7 @@ From the project root in normal PowerShell, run `npm.cmd --prefix .\frontend run
 | `AGENTS.md` | Standing project instructions |
 | `.gitignore` | Local environment, dependency, build, and runtime exclusions |
 | `AI-USE.md` | Course disclosure of development tools and application AI status |
-| `backend/` | FastAPI health and synthetic history routes, loader and tests, dependency lock, and ignored Python environment |
+| `backend/` | FastAPI health and synthetic history routes, SQLite recorder and Yahoo message adapter, backend tests, dependency lock, and ignored local runtime files |
 | `frontend/` | Vue connection interface and synthetic candlestick chart, Vite proxy, pinned manifest, and Chrome SmokeTest |
 | `docs/design-pipeline.md` | Planned data flow and evidence requirements |
 | `docs/verification.md` | Commands, expected results, and observed results |
