@@ -66,6 +66,48 @@ test('local connection shows health, backend outage, and recovery', async ({ pag
     await expectHealth('http://127.0.0.1:5173/api/health')
 
     await page.goto('/')
+    const sample = page.getByRole('region', { name: 'Synthetic one-minute sample' })
+    const chart = sample.getByRole('img', { name: 'Candlestick price and volume chart' })
+    await expect(chart).toBeVisible()
+    await expect(sample.getByRole('link', { name: 'TradingView' }))
+      .toHaveAttribute('href', 'https://www.tradingview.com/')
+
+    // Read the rendered canvas layers to verify separate candle bodies and aligned volume bars.
+    await expect.poll(() => chart.locator('canvas').evaluateAll((canvases) => {
+      const positions = { up: new Set(), down: new Set(), volume: new Set() }
+      const plotWidth = Math.max(0, ...canvases.map((canvas) => canvas.width))
+      for (const canvas of canvases) {
+        if (!plotWidth || canvas.width !== plotWidth || !canvas.height) continue
+        const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] !== 255) continue
+          const x = (i / 4) % canvas.width
+          const rgb = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2]
+          if (rgb === 0x087f72) positions.up.add(x)
+          if (rgb === 0xb84045) positions.down.add(x)
+          if (rgb === 0x638ca5) positions.volume.add(x)
+        }
+      }
+      const down = [...positions.down].sort((a, b) => a - b)
+      if (down.length < 2) return false
+      const left = [...positions.up].filter((x) => x < down[0])
+      const right = [...positions.up].filter((x) => x > down.at(-1))
+      return [left, down, right].every((body) => {
+        if (body.length < 2) return false
+        const center = Math.round((Math.min(...body) + Math.max(...body)) / 2)
+        return positions.volume.has(center)
+      })
+    })).toBe(true)
+
+    const inspect = sample.getByLabel('Inspect candle (UTC)')
+    await expect(inspect.locator('option')).toHaveCount(3)
+    await expect(inspect.locator('option').nth(0)).toHaveText(/9 November 2026.*14:30 UTC/)
+    await expect(inspect.locator('option').nth(1)).toHaveText(/9 November 2026.*14:31 UTC/)
+    await inspect.selectOption({ index: 1 })
+    const values = sample.locator('dl dd')
+    await expect(values).toHaveText(['102', '104', '100', '101', '850 shares'])
+    console.log('Chrome showed distinct candles and aligned volume. 14:31 UTC close 101, volume 850 shares.')
+
     const button = page.getByRole('button', { name: 'Check connection' })
     const status = page.getByRole('status')
 

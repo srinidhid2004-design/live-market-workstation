@@ -23,7 +23,7 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | FastAPI 0.162.5 and Uvicorn 0.54.0 import in the local environment. The implemented HTTP routes are `/api/health` and `/api/history`. |
 | Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed an in-memory write/read check. |
 | Market feed | Yahoo Finance via yfinance | yfinance did not import. The planned subscription uses no Yahoo credentials. |
-| Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The exact Vue and Vite pins are in `frontend/package.json`. The chart library is planned for a later prompt. |
+| Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The Vue, Vite, and Lightweight Charts 5.3.0 pins are in `frontend/package.json`. |
 | Package tools | pip for Python and npm for the frontend | pip 26.2.1 and both dependency locks are verified. The student completed the npm install from the official registry in normal PowerShell. |
 
 The approved Python environment is `backend/.venv`, created from CPython 3.14.7. The student installed the locked wheels through official PyPI in normal PowerShell. HTTPX is used only by the backend `unittest` tests. See [verification](docs/verification.md) for the setup evidence.
@@ -75,7 +75,13 @@ The student's official-registry production-only audit reported zero vulnerabilit
 
 The endpoint returns an array ordered by timestamp with exactly `timestamp`, `open`, `high`, `low`, `close`, and `volume`. The loader checks the header and row width, parses UTC minute starts and normalizes them to `Z`, rejects duplicate times and nonfinite prices, checks OHLC bounds, and requires nonnegative integer volume. An unreadable or invalid file returns a generic HTTP 500. These practice candles are synthetic. The route provides no evidence of live market data or Yahoo Finance connectivity.
 
-Prompt 3 verification passed in normal PowerShell. All 12 backend tests passed, `/api/history` returned HTTP 200 with three ordered candles matching the instructor CSV, and `/api/health` returned HTTP 200 with `{"status":"healthy"}`. To repeat the check, use the [Windows PowerShell procedure](docs/verification.md#bounded-normal-powershell-check). Live Yahoo Finance connectivity, SQLite persistence, candlestick charting, market-data WebSockets, and replay remain future work.
+Prompt 3 verification passed in normal PowerShell. All 12 backend tests passed, `/api/history` returned HTTP 200 with three ordered candles matching the instructor CSV, and `/api/health` returned HTTP 200 with `{"status":"healthy"}`. To repeat the check, use the [Windows PowerShell procedure](docs/verification.md#bounded-normal-powershell-check).
+
+### Inspect the synthetic chart
+
+Start the backend and frontend with the commands above and open `http://127.0.0.1:5173/`. The chart loads `/api/history` and draws a candle and aligned volume bar for each UTC minute. Hover over a candle or use **Inspect candle (UTC)** to see its date, time, OHLC prices, and volume. The expected close at 14:31 UTC on November 9, 2026 is **101**, with volume of **850 shares**.
+
+From the project root in normal PowerShell, run `npm.cmd --prefix .\frontend run test:connection` with ports 8000 and 5173 free. The test starts both services and checks the chart and connection behavior in installed Chrome. The chart passed an offline Chrome check with the synthetic fixture. The running-app SmokeTest still needs a shell with loopback access. Live Yahoo Finance ingestion, SQLite persistence, market-data WebSockets, and replay remain future work.
 
 ## Project map
 
@@ -86,7 +92,7 @@ Prompt 3 verification passed in normal PowerShell. All 12 backend tests passed, 
 | `.gitignore` | Local environment, dependency, build, and runtime exclusions |
 | `AI-USE.md` | Course disclosure of development tools and application AI status |
 | `backend/` | FastAPI health and synthetic history routes, loader and tests, dependency lock, and ignored Python environment |
-| `frontend/` | Vue connection interface, Vite proxy, pinned manifest, and Chrome SmokeTest |
+| `frontend/` | Vue connection interface and synthetic candlestick chart, Vite proxy, pinned manifest, and Chrome SmokeTest |
 | `docs/design-pipeline.md` | Planned data flow and evidence requirements |
 | `docs/verification.md` | Commands, expected results, and observed results |
 | `prompts/` | 20 original instructor prompts and the student-added governance checkpoint `01a-project-governance-and-version-control.md` |

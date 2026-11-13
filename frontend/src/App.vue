@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import CandleHistory from './components/CandleHistory.vue'
 
 const pending = ref(false)
 const message = ref('')
@@ -52,6 +53,7 @@ async function checkConnection() {
       <p v-if="status !== null">HTTP {{ status }}</p>
       <pre v-if="payload">{{ payload }}</pre>
     </div>
+    <CandleHistory />
   </main>
 </template>
 
@@ -63,8 +65,8 @@ async function checkConnection() {
 }
 
 main {
-  max-width: 40rem;
-  margin: 12vh auto 0;
+  max-width: 62rem;
+  margin: 2rem auto;
   padding: 1.5rem;
 }
 

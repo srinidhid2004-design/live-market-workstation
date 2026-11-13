@@ -4,7 +4,11 @@ The instructor prompts, three-row synthetic CSV, and Prompt 01a governance and [
 
 Prompt 3 adds a separate synthetic practice path. The instructor fixture at `prompts/data/sample-candles.csv` is copied byte for byte to `backend/data/sample-candles.csv`. The standard-library CSV loader validates the exact header and row width, normalizes UTC timestamps to `Z`, checks finite prices, OHLC bounds and nonnegative integer volume, rejects duplicate minutes, and sorts by timestamp. FastAPI serves only the six candle fields at `GET /api/history` and returns a generic HTTP 500 if the file is unreadable or invalid. Each row represents one UTC minute for one instrument. Its timestamp is inclusive, and the next minute's start is excluded.
 
-The Prompt 3 HTTP check returned three ordered candles. Each field matched the instructor fixture, and the health route still returned HTTP 200 with its exact body. The live Part 4.1 pipeline below remains planned. The synthetic CSV provides no evidence of Yahoo Finance connectivity. SQLite persistence, candlestick charting, market-data WebSockets, and replay remain future work.
+The Prompt 3 HTTP check returned three ordered candles. Each field matched the instructor fixture, and the health route still returned HTTP 200 with its exact body.
+
+Prompt 4 adds a Vue chart for the synthetic practice path. The component fetches `/api/history` through Vite and converts each ISO UTC timestamp to Unix seconds for both Lightweight Charts series. The price candlesticks and volume histogram share a time scale in two stacked panes. The crosshair and keyboard-accessible selector both update the selected candle's UTC date, time, OHLC values, and volume. The panel labels the source as a synthetic one-minute sample and includes the TradingView attribution.
+
+The live Part 4.1 pipeline below remains planned. The synthetic CSV provides no evidence of Yahoo Finance connectivity. SQLite persistence, market-data WebSockets, and replay remain future work.
 
 ```text
 [Yahoo Finance live stream, AAPL]

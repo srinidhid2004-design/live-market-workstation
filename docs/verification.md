@@ -335,3 +335,33 @@ Run this block from the project root in normal Windows PowerShell with loopback 
     }
 }
 ```
+
+## Prompt 4 - Synthetic candlestick and volume chart
+
+Preflight confirmed a clean `feature/assignment-4-part-1` at `c683818`, with the verified health checkpoint `0954655` in its history and `main` at `474573e`. The existing fixture and history route supplied three synthetic one-minute UTC candles. The student ran the proposed install in normal PowerShell with `--ignore-scripts`. The manifest and lockfile added `lightweight-charts@5.3.0` and locked its transitive dependency `fancy-canvas@2.1.0`. No other dependency versions changed.
+
+| Check | Observed result |
+| --- | --- |
+| Import the chart exports from the frontend | `version()` returned 5.3.0. `createChart`, `CandlestickSeries`, and `HistogramSeries` resolved. |
+| Focused backend regression | Nine history loader tests passed. Direct handler checks confirmed the existing health response and the three history rows, including the exact second candle. `pip check` passed. Backend code and fixtures were unchanged. |
+| `npm.cmd run lint` and `npm.cmd run build` from `frontend/` | ESLint passed with zero warnings. Vite production build passed with 19 modules transformed. |
+| Installed Chrome with the production bundle and fixture rows supplied in memory | Three distinct candle bodies, including 14:30 and 14:31, rendered above aligned volume bars. Selecting or hovering November 9, 2026 at 14:31 UTC displayed open 102, high 104, low 100, close 101, and 850 shares. The TradingView link was present and no page errors were observed. |
+| `npm.cmd run test:connection -- --global-timeout=15000` from `frontend/` | The running-app SmokeTest timed out during Playwright web-server setup. A separate local TCP probe returned Windows error 10013. The offline Chrome check used fixture rows in memory. End-to-end rendering over the running Vite proxy remains pending. |
+| Scope and cleanup | Ports 8000 and 5173 had no listeners afterward. All 21 starter archive hashes still matched. `git diff --check` passed. Generated output remained ignored, and the index was empty. |
+
+The first Chrome fixture run exposed a template reference collision: `ref="chart"` resolved to the chart API variable instead of the DOM element. Using a distinct `chartHost` template ref corrected initialization. A second run showed the canvas test was counting price-axis label pixels as candle pixels. Restricting the test to the plot-width canvases corrected the assertion. The repeated fixture check passed.
+
+From the project root in normal PowerShell, run `npm.cmd --prefix .\frontend run test:connection` with ports 8000 and 5173 free. The test starts Vite and Uvicorn, checks the real history response through the chart, and repeats the connection, outage, and recovery checks. The chart displays synthetic practice data.
+
+### Prompt 4 AutoLoop - Favicon console error
+
+The student reported that the normal-PowerShell SmokeTest passed the chart, direct and proxied health, backend outage, and recovery checks. The final console assertion failed because Chrome requested `/favicon.ico` and Vite returned HTTP 404.
+
+Added an inline 32 × 32 SVG favicon to `frontend/index.html`. The explicit icon gives Chrome a local resource without a separate HTTP request. The console assertion and its existing allowance for the intentional health outage were preserved. The first isolated Chrome check decoded the icon but reported a default intrinsic size of 150 × 150. Adding explicit SVG dimensions made the size check pass.
+
+| Check | Observed result |
+| --- | --- |
+| `npm.cmd --prefix .\frontend run test:connection` | The project shell stalled at Vite readiness, before browser assertions. A separate loopback probe returned Windows error 10013. The run was interrupted. A complete post-fix run in normal PowerShell is still pending. |
+| Installed Chrome with the production bundle and intercepted fixture responses | Chrome decoded the inline favicon as 32 × 32 and showed close 101 and volume 850 shares at 14:31 UTC. Chrome recorded no `/favicon.ico` request, page error, or console error during this check. |
+| ESLint and production build | Lint passed with zero warnings. The build passed with 19 modules transformed. |
+| Git and service cleanup | `git diff --check` passed. The final listener check found no listeners on ports 8000 and 5173. |
