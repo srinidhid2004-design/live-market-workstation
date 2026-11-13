@@ -285,10 +285,14 @@ Run this block from the project root in normal Windows PowerShell with loopback 
 
         $historyResponse = Invoke-WebRequest -UseBasicParsing `
             -Uri 'http://127.0.0.1:8000/api/history' -TimeoutSec 2
-        if ($historyResponse.StatusCode -ne 200 -or -not $historyResponse.Content.TrimStart().StartsWith('[')) {
-            throw 'Expected HTTP 200 with a JSON array.'
+        if ($historyResponse.StatusCode -ne 200) {
+            throw 'Expected HTTP 200 with the history envelope.'
         }
-        $history = $historyResponse.Content | ConvertFrom-Json
+        $envelope = $historyResponse.Content | ConvertFrom-Json
+        if ($envelope.symbol -cne 'AAPL' -or $envelope.interval -cne '1m') {
+            throw 'Expected the default AAPL one-minute history.'
+        }
+        $history = $envelope.candles
         if ($history.Count -ne 3) { throw 'Expected three history candles.' }
 
         $culture = [Globalization.CultureInfo]::InvariantCulture
@@ -476,3 +480,31 @@ Each scenario checked timestamp `2026-11-09T15:00:00Z`, the exact six market-dat
 | `.\backend\.venv\Scripts\python.exe -B -m pip --disable-pip-version-check check` | No broken requirements | Passed. No dependency was added or changed. |
 | `npm.cmd --prefix frontend run lint` and `npm.cmd --prefix frontend run build` | Zero ESLint warnings and a successful production bundle | Both passed. Vite 7.3.8 transformed 19 modules. |
 | Git, credential, private-path, generated-file, and runtime-database checks | No whitespace errors, credential or private-path matches, or tracked generated files | Passed, including whitespace checks on new files. The disposable databases were removed and no runtime database or sidecars remained. Ports 8000 and 5173 had no listeners. |
+
+## Prompt 07A - Regular-session timeframes
+
+Resumed on `feature/assignment-4-part-1` at `b9ed96c` with the two approved dependency-file edits, an empty index, no remote, and `main` at `474573e81efca7b4921cd602f4dee7803f804f36`. Normal PowerShell installed the four approved wheels after the restricted shell failed to resolve PyPI (Windows error 11001). Before source edits, all 40 installed distributions matched the lock, `exchange_calendars` imported at version 4.13.2, and `pip check` passed. The 36 original pins were preserved.
+
+| Deterministic calendar check | Observed |
+| --- | --- |
+| `get_calendar("XNAS")` | Calendar name `XNYS`, the shared regular U.S. equity schedule with no separate Nasdaq-specific exception calendar |
+| Regular session, November 9, 2026 | 14:30–21:00 UTC, 390 minutes |
+| Thanksgiving, November 26, 2026 | No regular session |
+| Early close, November 27, 2026 | 14:30–18:00 UTC, 210 minutes |
+| March 6 to March 9, 2026 | 09:30 New York open shifted from 14:30 UTC to 13:30 UTC |
+
+| Candle check | Observed |
+| --- | --- |
+| Three instructor minutes in `5m` | `2026-11-09T14:30:00Z`, O/H/L/C/V `100/105/99/104/3550`, partial 3/5 |
+| Same minutes in `1d` | Same timestamp and values, partial 3/390 |
+| Add 14:35 UTC and next session open | Second five-minute window at 14:35, same first daily candle with 4/390, and a new daily candle at the next open |
+| Hour alignment and early close | `14:30`, `15:30`, and `17:30` buckets; the last early-close bucket expected 30 minutes and completed at 18:00 UTC |
+| Cutoff, late receipt, revision, unknown volume, and malformed input | The snapshot excluded later minutes and used the earlier revision before its correction arrived. Unknown volume propagated as `null`; a known zero stayed `0`. Unsupported or malformed requests returned bounded 422 responses. |
+
+| Verification | Observed |
+| --- | --- |
+| Complete backend unittest discovery | All 52 tests passed with the process-local asyncio runner documented in Prompt 05, including health, recorder, synthetic history, and one-minute candle regressions. The pinned calendar emitted a pandas deprecation warning during schedule construction. |
+| `npm.cmd --prefix frontend run lint` and `npm.cmd --prefix frontend run build` | ESLint passed with zero warnings and the production bundle built successfully. |
+| Offline Chrome chart check | Intercepted requests served the built bundle and the fixture envelope. Chrome showed the three chart choices, the original 14:31 values, and the difference between unavailable and zero volume. No page errors were observed. |
+| `npm.cmd --prefix frontend run test:connection -- --global-timeout=15000` | Timed out during Vite setup before assertions. Repeat `npm.cmd --prefix frontend run test:connection` in normal PowerShell with loopback access. |
+| `git diff --check` and safety scans | Passed. The changed content had no credential-pattern or private-path matches. Generated files remained ignored and untracked. No runtime database or sidecars remained, and ports 8000 and 5173 had no listeners. No Yahoo request was made. |

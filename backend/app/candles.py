@@ -41,6 +41,25 @@ def _cumulative_total(value: object) -> int | None:
     return None
 
 
+def _visible_versions(
+    store: ObservationStore, source_name: str, ticker: str, as_of: datetime,
+) -> list[StoredObservation]:
+    cutoff = as_of.isoformat(timespec="microseconds").replace("+00:00", "Z")
+    roots: dict[int, int] = {}
+    visible: dict[int, StoredObservation] = {}
+    for row in store.read():
+        if row.source_name != source_name or row.ticker != ticker:
+            continue
+        root = row.observation_id if row.revision_of is None else roots[row.revision_of]
+        roots[row.observation_id] = root
+        if row.receipt_time_utc <= cutoff:
+            visible[root] = row
+    return sorted(
+        (row for row in visible.values() if row.source_time_utc <= cutoff),
+        key=lambda row: (row.source_time_utc, row.observation_id),
+    )
+
+
 def form_candles(
     store: ObservationStore,
     *,
@@ -48,11 +67,13 @@ def form_candles(
     ticker: str,
     evaluated_at: datetime,
     cumulative_volume_field: str | None = None,
+    as_of: datetime | None = None,
 ) -> list[Candle]:
     """Rebuild one source/ticker's candles from a single current-version read.
 
     Supply a volume field only when its cumulative session semantics are known.
     The evaluation time determines completion; the read determines candle values.
+    Supply as_of to select the revisions available at that UTC receipt cutoff.
     """
     if evaluated_at.utcoffset() != timedelta(0):
         raise ValueError("Candle evaluation time must be timezone-aware UTC.")
@@ -62,10 +83,15 @@ def form_candles(
     if not source_name or not ticker:
         raise ValueError("A source name and ticker are required.")
 
-    observations = (
-        row for row in store.read(current_only=True, order="source")
-        if row.source_name == source_name and row.ticker == ticker
-    )
+    if as_of is None:
+        observations = (
+            row for row in store.read(current_only=True, order="source")
+            if row.source_name == source_name and row.ticker == ticker
+        )
+    else:
+        if as_of.utcoffset() != timedelta(0) or as_of > evaluated_at:
+            raise ValueError("The UTC receipt cutoff must be at or before evaluation time.")
+        observations = _visible_versions(store, source_name, ticker, as_of.astimezone(UTC))
     baseline: int | None = None
     candles: list[Candle] = []
     for minute, rows in groupby(observations, key=_minute_start):

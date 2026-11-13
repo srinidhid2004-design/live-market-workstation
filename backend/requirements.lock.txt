@@ -34,3 +34,7 @@ tzdata==2026.6
 urllib3==2.8.0
 websockets==17.4
 yfinance==1.8.0
+exchange-calendars==4.13.2
+korean-lunar-calendar==0.4.0
+pyluach==2.3.0
+toolz==1.2.0

@@ -47,7 +47,7 @@ onMounted(async () => {
     })
     if (!response.ok) throw new Error('History request failed.')
 
-    const rows = await response.json()
+    const { candles: rows } = await response.json()
     if (request.signal.aborted) return
     if (rows.length === 0) {
       state.value = 'No synthetic candles available.'
@@ -91,7 +91,9 @@ onMounted(async () => {
     priceSeries.setData(data.map(({ time, open, high, low, close }) => ({
       time, open, high, low, close,
     })))
-    volumeSeries.setData(data.map(({ time, volume }) => ({ time, value: volume })))
+    volumeSeries.setData(data.map(({ time, volume }) => (
+      volume === null ? { time } : { time, value: volume }
+    )))
     chart.timeScale().fitContent()
     chart.subscribeCrosshairMove(inspectFromChart)
     candles.value = data
@@ -131,7 +133,10 @@ onBeforeUnmount(() => {
         <div><dt>High</dt><dd>{{ selected.high }}</dd></div>
         <div><dt>Low</dt><dd>{{ selected.low }}</dd></div>
         <div><dt>Close</dt><dd>{{ selected.close }}</dd></div>
-        <div><dt>Volume</dt><dd>{{ volumeFormat.format(selected.volume) }} shares</dd></div>
+        <div>
+          <dt>Volume</dt>
+          <dd>{{ selected.volume === null ? 'Unavailable' : `${volumeFormat.format(selected.volume)} shares` }}</dd>
+        </div>
       </dl>
     </template>
 

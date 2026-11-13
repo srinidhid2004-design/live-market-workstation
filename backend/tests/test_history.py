@@ -100,11 +100,19 @@ class HistoryRouteTest(unittest.IsolatedAsyncioTestCase):
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://testserver"
         ) as client:
-            response = await client.get("/api/history")
+            response = await client.get("/api/history", params={"as_of": "2026-11-09T21:00:00Z"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["content-type"], "application/json")
-        candles = response.json()
+        envelope = response.json()
+        self.assertEqual(set(envelope), {"symbol", "interval", "as_of", "candles", "metadata"})
+        self.assertEqual((envelope["symbol"], envelope["interval"], envelope["as_of"]),
+                         ("AAPL", "1m", "2026-11-09T21:00:00Z"))
+        self.assertEqual(envelope["metadata"], [
+            {"timestamp": timestamp, "coverage": "full", "observed_minutes": 1,
+             "expected_minutes": 1, "is_complete": True} for timestamp in EXPECTED_TIMES
+        ])
+        candles = envelope["candles"]
         self.assertEqual([candle["timestamp"] for candle in candles], EXPECTED_TIMES)
         self.assertEqual(candles[1], SECOND_CANDLE)
         for candle in candles:
@@ -130,3 +138,43 @@ class HistoryRouteTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 response.json(), {"detail": "Historical candle data is unavailable."}
             )
+
+    async def test_interval_options_and_fixture_cutoff(self) -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            for interval, expected in (("1m", 1), ("5m", 5), ("15m", 15), ("1h", 60), ("1d", 390)):
+                with self.subTest(interval=interval):
+                    response = await client.get("/api/history", params={
+                        "symbol": "AAPL", "interval": interval, "as_of": "2026-11-09T14:32:30Z",
+                    })
+                    self.assertEqual(response.status_code, 200)
+                    result = response.json()
+                    self.assertEqual(result["interval"], interval)
+                    self.assertEqual(result["metadata"][0]["expected_minutes"], expected)
+                    self.assertEqual(result["metadata"][0]["observed_minutes"], 1 if interval == "1m" else 2)
+                    self.assertEqual(result["candles"][-1]["close"], 101)
+                    self.assertNotIn("2026-11-09T14:32:00Z", [row["timestamp"] for row in result["candles"]])
+
+    async def test_invalid_queries_return_bounded_errors(self) -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            for params, detail in (
+                ({"symbol": "MSFT"}, "Unsupported symbol."),
+                ({"interval": "2m"}, "Unsupported interval."),
+                ({"bogus": "x" * 256}, "Invalid history query parameters."),
+                ([("interval", "1m"), ("interval", "5m")], "Invalid history query parameters."),
+            ):
+                with self.subTest(params=params):
+                    response = await client.get("/api/history", params=params)
+                    self.assertEqual(response.status_code, 422)
+                    self.assertEqual(response.json(), {"detail": detail})
+            for value in ("", "2026-11-09", "2026-02-30T00:00:00Z", "2026-11-09T14:30:00-05:00",
+                          "9999-12-31T23:59:59Z", "1900-01-01T00:00:00Z"):
+                with self.subTest(as_of=value):
+                    response = await client.get("/api/history", params={"as_of": value})
+                    self.assertEqual(response.status_code, 422)
+                    self.assertEqual(response.json(), {
+                        "detail": "as_of must be a supported UTC timestamp at or before now.",
+                    })

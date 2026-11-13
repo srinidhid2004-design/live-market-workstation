@@ -3,7 +3,8 @@ import math
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict
+
+from .candles import CandleData as Candle
 
 
 FIELDS = ("timestamp", "open", "high", "low", "close", "volume")
@@ -11,15 +12,6 @@ UTC_MINUTE = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:00(?:\.0+)?(?:Z|\+00:00)"
 )
 VOLUME = re.compile(r"[0-9]+")
-
-
-class Candle(TypedDict):
-    timestamp: str
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
 
 
 class HistoryDataError(ValueError):

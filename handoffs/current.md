@@ -2,6 +2,8 @@
 
 ## Checkpoint
 
+Prompt 07A adds `1m`, `5m`, `15m`, `1h`, and `1d` AAPL history with a metadata envelope. The default chart still uses the three synthetic minutes. The five-minute fixture gives `100/105/99/104/3550` with 3/5 coverage, and daily coverage is 3/390. Saved-observation snapshots can apply an `as_of` cutoff before revision selection. The approved 40-pin lock is installed, and `XNAS` resolves to the shared `XNYS` regular-session calendar. See the [Prompt 07A verification](../docs/verification.md#prompt-07a---regular-session-timeframes).
+
 Prompt 07 adds provider-independent one-minute UTC candle calculation over the SQLite recorder's current versions. The constructed AAPL fixture returned O/H/L/C/V `100/103/100/101/11` before and at completion, and again after the late observation. All 41 backend tests passed with the process-local asyncio runner. `pip check`, frontend ESLint, and the production build passed. See the [Prompt 07 results](../docs/verification.md#prompt-07---one-minute-candles).
 
 Prompt 06 adds the SQLite observation recorder and an adapter for decoded Yahoo messages. The ignored runtime path is `backend/data/observations.sqlite3`. Use `.\.venv\Scripts\python.exe -B -m app.observations` from `backend/` to initialize it. Constructed inputs verified repeat suppression, revision retention, and persistence after reopening in a fresh Python backend process. All 24 backend tests passed, as did `pip check`, frontend lint, and the production build. See [Prompt 06 verification](../docs/verification.md#prompt-06---sqlite-observation-recorder).
@@ -24,7 +26,8 @@ Prompt 07 started at `54da86d` on `feature/assignment-4-part-1`, with `main` at 
 
 ## Outstanding decisions and next task
 
-- Obtain separate approval for an AAPL receipt check during active market conditions to collect final Assignment 4.1 evidence. The decoder adapter and candle calculation are available for the future live pipeline. Application WebSockets, frontend live updates, and replay remain pending.
+- Obtain separate approval for an AAPL receipt check during active market conditions to collect final Assignment 4.1 evidence. The decoder, recorder, and candle calculations are available for the future live pipeline. Saved-history delivery, application WebSockets, frontend live updates, and replay remain pending.
+- Run the connection SmokeTest in normal PowerShell with loopback access. The Prompt 07A run in the project shell reached the Vite readiness deadline before assertions. In-process backend tests and the offline Chrome chart check passed.
 - Later design decisions include the stale-data threshold, live provider volume mapping, and replay order and pacing. Keep the course disclosure current as tools or models change.
 
 ## Prompt 2A connectivity retry

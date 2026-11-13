@@ -23,10 +23,11 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | FastAPI 0.162.5 and Uvicorn 0.54.0 import in the local environment. The implemented HTTP routes are `/api/health` and `/api/history`. |
 | Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed the Prompt 06 recorder and restart checks with constructed observations. |
 | Market feed | Yahoo Finance via yfinance | `yfinance==1.8.0` and `websockets==17.4` import in `backend/.venv`. The normal-PowerShell AAPL probe resolved DNS and opened the WebSocket. It timed out after 25 seconds without a qualifying update. |
+| Exchange sessions | `exchange-calendars==4.13.2` | AAPL requests `XNAS`, which uses the shared `XNYS` U.S. equity schedule. The alias has no separate Nasdaq-specific exception schedule. |
 | Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The Vue, Vite, and Lightweight Charts 5.3.0 pins are in `frontend/package.json`. |
 | Package tools | pip for Python and npm for the frontend | pip 26.2.1 runs in the existing environment. The student completed the npm install from the official registry in normal PowerShell. The 36-pin Python lock was checked against the approved resolution. |
 
-The approved Python environment is `backend/.venv`, created from CPython 3.14.7. The student completed the locked wheel installation through official PyPI in normal PowerShell. All 36 application pins match the installed distributions, and `pip check` passes. HTTPX is used only by the backend `unittest` tests. See [verification](docs/verification.md) for the setup evidence.
+The approved Python environment is `backend/.venv`, created from CPython 3.14.7. The student completed the locked wheel installation through official PyPI in normal PowerShell. All 40 application pins match the installed distributions, and `pip check` passes. HTTPX is used only by the backend `unittest` tests. See [verification](docs/verification.md) for the setup evidence.
 
 ## Run locally
 
@@ -75,11 +76,13 @@ The student's official-registry production-only audit reported zero vulnerabilit
 
 ### Synthetic CSV history
 
-`GET /api/history` returns three synthetic practice candles from `backend/data/sample-candles.csv`, a byte-for-byte copy of the instructor file at `prompts/data/sample-candles.csv`. Each row represents one instrument over one UTC minute. The timestamp marks the inclusive start, and the next minute's start is excluded. The 14:30 candle covers `14:30:00Z` through the instant immediately before `14:31:00Z`.
+`GET /api/history` defaults to three one-minute synthetic practice candles for AAPL from `backend/data/sample-candles.csv`, a byte-for-byte copy of `prompts/data/sample-candles.csv`. The UTC timestamp is the inclusive start of the interval. The 14:30 minute ends just before `14:31:00Z`.
 
-The endpoint returns an array ordered by timestamp with exactly `timestamp`, `open`, `high`, `low`, `close`, and `volume`. The loader checks the header and row width, parses UTC minute starts and normalizes them to `Z`, rejects duplicate times and nonfinite prices, checks OHLC bounds, and requires nonnegative integer volume. An unreadable or invalid file returns a generic HTTP 500. These practice candles are synthetic. The route provides no evidence of live market data or Yahoo Finance connectivity.
+The endpoint supports `interval=1m`, `5m`, `15m`, `1h`, or `1d`, and `symbol=AAPL`. Optional `as_of` accepts a supported ISO 8601 UTC timestamp at or before the current time, with `Z` or `+00:00`. The default cutoff is the request's current UTC time. The CSV contains finished minute summaries, so a row becomes available at its minute's end. Unsupported parameters, duplicate keys, and invalid evaluation times return a bounded HTTP 422. An unreadable or invalid CSV returns a generic HTTP 500.
 
-Prompt 3 verification passed in normal PowerShell. All 12 backend tests passed, `/api/history` returned HTTP 200 with three ordered candles matching the instructor CSV, and `/api/health` returned HTTP 200 with `{"status":"healthy"}`. To repeat the check, use the [Windows PowerShell procedure](docs/verification.md#bounded-normal-powershell-check).
+The response contains `symbol`, `interval`, `as_of`, `candles`, and `metadata`. Each timestamp-ordered candle has exactly `timestamp`, `open`, `high`, `low`, `close`, and `volume`. Each metadata row gives the matching `timestamp`, `coverage` (`full` or `partial`), `observed_minutes`, `expected_minutes`, and `is_complete`. Intraday windows start at the session open, and a daily candle spans one regular session. A window completes at its scheduled end even with partial coverage. Gaps preserve window alignment, and empty windows are omitted. Volume sums observed constituent minutes and is `null` if any contributing volume is unknown.
+
+For example, `/api/history?symbol=AAPL&interval=5m&as_of=2026-11-09T14:35:00Z` returns a 14:30 UTC candle with O/H/L/C/V `100/105/99/104/3550` and partial coverage of three of five minutes. The data remains synthetic. See the [Prompt 07A checks](docs/verification.md#prompt-07a---regular-session-timeframes) and the [PowerShell history check](docs/verification.md#bounded-normal-powershell-check).
 
 ### Inspect the synthetic chart
 
@@ -103,7 +106,7 @@ The `observations` table stores an immutable ID that doubles as receipt order, s
 
 `app.candles.form_candles()` reads current versions for one source and ticker. It groups observations by UTC source minute, including the minute start and excluding the next boundary. Prices are ordered by source time and then by immutable observation ID, which is the recorder's receipt order. Empty minutes produce no candle. Recalculating after a late observation or a verified correction uses the updated snapshot. Earlier observation versions remain in the recorder for audit.
 
-Each candle has exactly six market-data fields in `data` (`timestamp`, `open`, `high`, `low`, `close`, `volume`) and a separate `is_complete`. The caller supplies a UTC evaluation time. Completion begins at the next minute boundary and does not prevent a later recalculation from changing OHLCV.
+Each candle has exactly six market-data fields in `data` (`timestamp`, `open`, `high`, `low`, `close`, `volume`) and a separate `is_complete`. The caller supplies a UTC evaluation time. Completion begins at the next minute boundary and does not prevent a later recalculation from changing OHLCV. An optional `as_of` cutoff selects the latest saved revision received by that time and excludes later source times. Higher timeframes can consume this snapshot when saved history is wired into the application.
 
 For a field explicitly identified as a cumulative session total, volume is the last valid total in the minute minus the most recent valid total strictly before the minute. A missing or invalid in-minute value, missing baseline, or observed decrease yields `None` (JSON `null`). A known zero is `0`. The constructed fixture uses `day_volume` for this calculation. Yahoo's live volume semantics remain unverified. The Python logic is available for future integration, and `/api/history` continues to serve the synthetic CSV. See the [Prompt 07 checks](docs/verification.md#prompt-07---one-minute-candles).
 

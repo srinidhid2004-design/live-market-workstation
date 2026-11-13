@@ -108,6 +108,18 @@ test('local connection shows health, backend outage, and recovery', async ({ pag
     await expect(values).toHaveText(['102', '104', '100', '101', '850 shares'])
     console.log('Chrome showed distinct candles and aligned volume. 14:31 UTC close 101, volume 850 shares.')
 
+    await page.route('**/api/history', async (route) => {
+      const response = await route.fetch()
+      const history = await response.json()
+      history.candles[0].volume = null
+      history.candles[1].volume = 0
+      await route.fulfill({ response, json: history })
+    }, { times: 1 })
+    await page.reload()
+    await expect(values.last()).toHaveText('Unavailable')
+    await inspect.selectOption({ index: 1 })
+    await expect(values.last()).toHaveText('0 shares')
+
     const button = page.getByRole('button', { name: 'Check connection' })
     const status = page.getByRole('status')
 
