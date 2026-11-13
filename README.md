@@ -20,7 +20,7 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | --- | --- | --- |
 | Local shell | Windows and PowerShell | Windows x64, build 26300, PowerShell 7.6.9 |
 | Backend | Python with type hints | Python 3.14.7 runs directly. The Windows `python` and `py` aliases failed in the project shell. |
-| API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | FastAPI 0.162.5 and Uvicorn 0.54.0 import in the local environment. Prompt 2 implements the HTTP health route. |
+| API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | FastAPI 0.162.5 and Uvicorn 0.54.0 import in the local environment. The implemented HTTP routes are `/api/health` and `/api/history`. |
 | Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed an in-memory write/read check. |
 | Market feed | Yahoo Finance via yfinance | yfinance did not import. The planned subscription uses no Yahoo credentials. |
 | Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The exact Vue and Vite pins are in `frontend/package.json`. The chart library is planned for a later prompt. |
@@ -69,6 +69,14 @@ This checkpoint verifies local HTTP connectivity. Yahoo Finance availability, li
 
 The student's official-registry production-only audit reported zero vulnerabilities. The pinned ESLint release has an npm support-window warning, and lint passed with zero warnings. The esbuild CLI reported 0.28.2 and Vite built successfully with the esbuild post-install script still unapproved.
 
+### Synthetic CSV history
+
+`GET /api/history` returns three synthetic practice candles from `backend/data/sample-candles.csv`, a byte-for-byte copy of the instructor file at `prompts/data/sample-candles.csv`. Each row represents one instrument over one UTC minute. The timestamp marks the inclusive start, and the next minute's start is excluded. The 14:30 candle covers `14:30:00Z` through the instant immediately before `14:31:00Z`.
+
+The endpoint returns an array ordered by timestamp with exactly `timestamp`, `open`, `high`, `low`, `close`, and `volume`. The loader checks the header and row width, parses UTC minute starts and normalizes them to `Z`, rejects duplicate times and nonfinite prices, checks OHLC bounds, and requires nonnegative integer volume. An unreadable or invalid file returns a generic HTTP 500. These practice candles are synthetic. The route provides no evidence of live market data or Yahoo Finance connectivity.
+
+Prompt 3 verification passed in normal PowerShell. All 12 backend tests passed, `/api/history` returned HTTP 200 with three ordered candles matching the instructor CSV, and `/api/health` returned HTTP 200 with `{"status":"healthy"}`. To repeat the check, use the [Windows PowerShell procedure](docs/verification.md#bounded-normal-powershell-check). Live Yahoo Finance connectivity, SQLite persistence, candlestick charting, market-data WebSockets, and replay remain future work.
+
 ## Project map
 
 | Path | Contents |
@@ -77,7 +85,7 @@ The student's official-registry production-only audit reported zero vulnerabilit
 | `AGENTS.md` | Standing project instructions |
 | `.gitignore` | Local environment, dependency, build, and runtime exclusions |
 | `AI-USE.md` | Course disclosure of development tools and application AI status |
-| `backend/` | FastAPI health route, focused test, dependency lock, and ignored Python environment |
+| `backend/` | FastAPI health and synthetic history routes, loader and tests, dependency lock, and ignored Python environment |
 | `frontend/` | Vue connection interface, Vite proxy, pinned manifest, and Chrome SmokeTest |
 | `docs/design-pipeline.md` | Planned data flow and evidence requirements |
 | `docs/verification.md` | Commands, expected results, and observed results |

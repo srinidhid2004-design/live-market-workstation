@@ -2,7 +2,9 @@
 
 The instructor prompts, three-row synthetic CSV, and Prompt 01a governance and [AI disclosure](../AI-USE.md) documents exist today. [Instructor Prompt 2](../prompts/02-connect-vue-and-fastapi.md) verified the Vue button, Vite proxy on port 5173, and FastAPI route on port 8000 in installed Chrome. Both routes returned HTTP 200 and `{"status":"healthy"}` before and after the restart. The Vite proxy returned HTTP 500 during the intentional backend outage, and Vue displayed `Backend unavailable.`. See the [verification log](verification.md) for the console and shutdown results.
 
-Assignment 4 is cumulative. The market-data pipeline below remains planned for Part 4.1. The health check verifies local HTTP transport. Live Yahoo Finance availability, persistence, candle correctness, and WebSocket delivery require their own evidence.
+Prompt 3 adds a separate synthetic practice path. The instructor fixture at `prompts/data/sample-candles.csv` is copied byte for byte to `backend/data/sample-candles.csv`. The standard-library CSV loader validates the exact header and row width, normalizes UTC timestamps to `Z`, checks finite prices, OHLC bounds and nonnegative integer volume, rejects duplicate minutes, and sorts by timestamp. FastAPI serves only the six candle fields at `GET /api/history` and returns a generic HTTP 500 if the file is unreadable or invalid. Each row represents one UTC minute for one instrument. Its timestamp is inclusive, and the next minute's start is excluded.
+
+The Prompt 3 HTTP check returned three ordered candles. Each field matched the instructor fixture, and the health route still returned HTTP 200 with its exact body. The live Part 4.1 pipeline below remains planned. The synthetic CSV provides no evidence of Yahoo Finance connectivity. SQLite persistence, candlestick charting, market-data WebSockets, and replay remain future work.
 
 ```text
 [Yahoo Finance live stream, AAPL]

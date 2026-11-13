@@ -191,3 +191,147 @@ The backend and browser results below are the student's normal-PowerShell eviden
 | Expect only `ECONNREFUSED` immediately after deliberately stopping FastAPI. Windows returned `read ECONNRESET`. | Allow exactly the refusal and reset error codes on the post-shutdown direct-request assertion. A new socket can be refused and a reused socket can be reset. Keep the proxy, browser, recovery, console, and cleanup assertions. | The corrected Chrome run passed the complete outage and recovery flow and released both listening ports. |
 
 Prompt 2 verifies local Vue–Vite–FastAPI HTTP connectivity. Yahoo Finance availability, live data, SQLite persistence, candlestick correctness, and WebSocket market streaming remain outside this checkpoint.
+
+## Prompt 3 - Synthetic one-minute CSV history
+
+The starting feature branch was clean at `0954655`. The project had no remote or SQLite file, and Prompt 2's passing health test and Chrome SmokeTest were documented. The instructor archive was verified before editing. This checkpoint made no Yahoo Finance request.
+
+| Check | Observed result |
+| --- | --- |
+| SHA-256 of `prompts/data/sample-candles.csv` and `backend/data/sample-candles.csv` | Both files have SHA-256 `331afdd6729190444595cb8df1a02d3c213e16fc7521400797a110503df2dfa8`. The runtime fixture is a byte-for-byte copy. |
+| From `backend/`, run `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_history.py -v -k HistoryLoaderTest` | Nine loader tests passed. They covered the sample, ordering, UTC normalization, duplicates, invalid timestamps, nonnumeric and nonfinite prices, invalid volume, impossible OHLC values, headers, and row width. |
+| Compile Python sources in memory and import FastAPI, Uvicorn, Pydantic, HTTPX, and the app | Five Python files compiled, the imports passed, and FastAPI generated the history response schema. Direct handler checks confirmed the sample and the generic HTTP 500 detail for an unreadable file. |
+| `.\.venv\Scripts\python.exe -B -m pip --disable-pip-version-check check` from `backend/` | No broken requirements found. |
+| `npm.cmd run lint` and `npm.cmd run build` from `frontend/` | ESLint passed with zero warnings. Vite built successfully with 10 modules transformed. |
+| Full backend unittest discovery with a 12-second diagnostic deadline | The restricted shell timed out in Windows asyncio's internal socket setup before the unchanged health test reached its assertions. The later normal-PowerShell run is recorded below. |
+| Local TCP loopback probe | The restricted shell returned `PermissionError` with Windows error 10013. The later running HTTP check was performed in normal PowerShell. |
+| Git, ignore, credential, private-path, and fixture checks | `git diff --check` and the untracked-file whitespace scan passed. Credential and private-path scans found no matches in 47 tracked or review-candidate files. All 20 instructor prompts and the source CSV still matched the starter archive by SHA-256. The backend fixture is eligible for tracking, and runtime output remains ignored. No SQLite files or port 8000 listener were found. The feature branch remains at `0954655` and `main` at `474573e`, with no staged changes or remote. |
+
+The second row matched all six fixture values in the loader and the direct handler. Its inclusive UTC interval is `[14:31:00Z, 14:32:00Z)`.
+
+| timestamp | open | high | low | close | volume |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `2026-11-09T14:31:00Z` | 102 | 104 | 100 | 101 | 850 |
+
+### Prompt 3A - Completed normal-PowerShell verification
+
+The student ran the complete suite and verified both endpoints in normal Windows PowerShell 5.1. The results below are from that session.
+
+| Check | Observed result |
+| --- | --- |
+| Complete backend unittest discovery | 12 tests passed in 0.667 seconds. This includes the unchanged health test, nine loader tests, the exact history field and type test, and the safe error test for missing and malformed files. An asyncio diagnostic reported that one task took 0.208 seconds. The task passed. |
+| `GET /api/history` | HTTP 200 with exactly three candles in ascending timestamp order. Every field in every row matched the instructor CSV. |
+| Second HTTP candle | `{"timestamp":"2026-11-09T14:31:00Z","open":102.0,"high":104.0,"low":100.0,"close":101.0,"volume":850}` |
+| `GET /api/health` | HTTP 200 with exact body `{"status":"healthy"}`. |
+| Cleanup | The test server stopped and a final query found no listener on port 8000. |
+| Final local regression checks | Python syntax and imports passed for the five backend source and test files. `pip check` found no broken requirements. Nine focused loader tests passed in 0.145 seconds. Frontend ESLint passed with zero warnings and Vite built 10 modules successfully. |
+| Repeatable command check | Windows PowerShell 5.1 parsed the full block below. Its comparison code accepted three matching fixture rows and rejected an incorrect second-row volume in an offline check. The successful running HTTP evidence is from the student session. |
+| Final workspace checks | `git diff --check` passed. Credential and private-path scans found no matches in 47 files. All 20 instructor prompts and the source CSV still matched the starter archive, and both fixture copies still shared one SHA-256. No SQLite file or listener on port 8000 was found. The local checks made no Yahoo Finance request. Generated output remained ignored and untracked. |
+
+#### Verification-command revisions
+
+| First approach | Revised approach and result |
+| --- | --- |
+| An inline `python -c` wrapper contained nested quotes around the unittest arguments. Windows PowerShell 5.1 stripped the inner quotes when building the native command line. Python treated `unittest`, `discover`, and the other argument values as names and raised `NameError`. | Run `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v` directly from `backend/`. All 12 tests passed. |
+| The HTTP comparison wrapped `$historyResponse.Content \| ConvertFrom-Json` in `@()`. Windows PowerShell 5.1 produced one nested array object, so the script counted one item. The HTTP response contained three candles. | Assign the decoded JSON directly to `$history` and compare the rows individually. The three rows and all six values of the second candle matched, and the listening port was released. |
+
+Both issues were in the verification commands. The application and tests stayed as implemented in Prompt 3. The endpoint serves synthetic practice data. Live Yahoo Finance connectivity, SQLite persistence, candlestick charting, market-data WebSockets, and replay remain pending.
+
+### Bounded normal-PowerShell check
+
+Run this block from the project root in normal Windows PowerShell with loopback access. It runs the full backend suite and verifies both HTTP endpoints. It requires port 8000 to be free and stops only the Uvicorn process tree it starts.
+
+```powershell
+& {
+    $ErrorActionPreference = 'Stop'
+
+    function Get-HistoryListener {
+        $connections = netstat.exe -ano -p TCP
+        if ($LASTEXITCODE -ne 0) { throw 'Could not inspect local TCP listeners.' }
+        $connections | Select-String -Pattern '^\s*TCP\s+\S+:8000\s+\S+\s+LISTENING\s+\d+\s*$'
+    }
+
+    if (Get-HistoryListener) { throw 'Port 8000 already has a listener.' }
+    $fixture = @(Import-Csv -LiteralPath .\prompts\data\sample-candles.csv)
+    if ($fixture.Count -ne 3) { throw 'Expected three instructor fixture rows.' }
+
+    Push-Location .\backend
+    $server = $null
+    try {
+        .\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
+        if ($LASTEXITCODE -ne 0) { throw 'Backend unittest discovery failed.' }
+        if (Get-HistoryListener) { throw 'Port 8000 already has a listener.' }
+
+        $server = Start-Process -FilePath (Resolve-Path .\.venv\Scripts\python.exe).Path `
+            -ArgumentList '-B', '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000' `
+            -WorkingDirectory (Get-Location).Path -WindowStyle Hidden -PassThru
+
+        $healthUrl = 'http://127.0.0.1:8000/api/health'
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        $healthResponse = $null
+        do {
+            if ($server.HasExited) { throw 'Uvicorn exited before becoming ready.' }
+            try {
+                $healthResponse = Invoke-WebRequest -UseBasicParsing -Uri $healthUrl -TimeoutSec 2
+            } catch {
+                Start-Sleep -Milliseconds 200
+            }
+        } until ($healthResponse -or $clock.Elapsed.TotalSeconds -ge 10)
+
+        if (-not $healthResponse) { throw 'Uvicorn did not become ready.' }
+        if ($healthResponse.StatusCode -ne 200 -or $healthResponse.Content -cne '{"status":"healthy"}') {
+            throw 'Health response did not match HTTP 200 and the exact JSON body.'
+        }
+
+        $historyResponse = Invoke-WebRequest -UseBasicParsing `
+            -Uri 'http://127.0.0.1:8000/api/history' -TimeoutSec 2
+        if ($historyResponse.StatusCode -ne 200 -or -not $historyResponse.Content.TrimStart().StartsWith('[')) {
+            throw 'Expected HTTP 200 with a JSON array.'
+        }
+        $history = $historyResponse.Content | ConvertFrom-Json
+        if ($history.Count -ne 3) { throw 'Expected three history candles.' }
+
+        $culture = [Globalization.CultureInfo]::InvariantCulture
+        $fields = 'close,high,low,open,timestamp,volume'
+        for ($i = 0; $i -lt $fixture.Count; $i++) {
+            $row = $history[$i]
+            $expected = $fixture[$i]
+            if ((($row.PSObject.Properties.Name | Sort-Object) -join ',') -cne $fields) {
+                throw "Unexpected fields in row $($i + 1)."
+            }
+            if ($row.timestamp -cne $expected.timestamp -or
+                ($i -gt 0 -and [string]::CompareOrdinal($history[$i - 1].timestamp, $row.timestamp) -ge 0)) {
+                throw "Timestamp or order mismatch in row $($i + 1)."
+            }
+            foreach ($field in 'open', 'high', 'low', 'close') {
+                if (($row.$field -isnot [ValueType]) -or $row.$field -is [bool] -or
+                    $row.$field -ne [double]::Parse($expected.$field, $culture)) {
+                    throw "Price mismatch for $field in row $($i + 1)."
+                }
+            }
+            if (($row.volume -isnot [int] -and $row.volume -isnot [long]) -or
+                $row.volume -ne [long]::Parse($expected.volume, $culture)) {
+                throw "Volume mismatch in row $($i + 1)."
+            }
+        }
+        if ($history[1].timestamp -cne '2026-11-09T14:31:00Z') {
+            throw 'The second candle did not match the expected minute.'
+        }
+
+        "GET /api/history HTTP 200, three ordered rows match the fixture."
+        $history[1] | ConvertTo-Json -Compress
+        'GET /api/health HTTP 200 {"status":"healthy"}'
+    } finally {
+        try {
+            if ($server -and -not $server.HasExited) {
+                taskkill.exe /PID $server.Id /T /F | Out-Null
+                if (-not $server.WaitForExit(5000)) { throw 'Uvicorn shutdown timed out.' }
+            }
+        } finally {
+            Pop-Location
+            if (Get-HistoryListener) { throw 'Port 8000 still has a listener.' }
+            'Port 8000 released.'
+        }
+    }
+}
+```

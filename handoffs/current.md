@@ -2,7 +2,7 @@
 
 ## Checkpoint
 
-Prompt 2 verification is complete and ready for student review. Both dependency sets were installed in approved normal PowerShell sessions and verified against the locks. The backend unittest passed, and the installed-Chrome SmokeTest passed after the Prompt 2C assertion correction. The endpoint, outage, recovery, console, and cleanup results are recorded in [verification](../docs/verification.md). The market-data pipeline in [design notes](../docs/design-pipeline.md) remains planned.
+Prompt 2 was verified and committed at `0954655`. Prompt 3 is verified and ready for review. In normal PowerShell, all 12 backend tests passed in 0.667 seconds. `GET /api/history` returned HTTP 200 and three ordered synthetic one-minute UTC candles matching the instructor CSV. `GET /api/health` returned HTTP 200 and `{"status":"healthy"}`. Port 8000 had no listener after cleanup. The [repeatable check](../docs/verification.md#bounded-normal-powershell-check) uses direct unittest arguments and assigns the decoded JSON directly for Windows PowerShell 5.1 compatibility.
 
 ## Files and checks
 
@@ -11,12 +11,12 @@ Prompt 2 verification is complete and ready for student review. Both dependency 
 - Confirmed the starting root was empty and outside Git. Verified the Windows tools, discovered a working base Python 3.14.7 despite the failed shell aliases, and verified SQLite with an in-memory round trip. Node.js, npm, npx, pip, and Corepack ran. No project-configured Python environment, dependency manifests, or lockfiles were found. See [verification](../docs/verification.md) for missing packages and exact checks.
 - The final tree contained 27 files. The six new documents were nonempty, their file links resolved, and a second hash comparison confirmed the starter materials still matched the archive.
 - Prompt 01a added `.gitignore`, [AI-USE.md](../AI-USE.md), and the student-added [governance prompt](../prompts/01a-project-governance-and-version-control.md). Updated the README, project instructions, design notes, verification log, and this handoff. The application directories remain empty and no project dependencies are installed.
-- The foundation is committed at `474573e`. The active branch is `feature/assignment-4-part-1` and `main` points to the same commit. There are no staged changes or configured remotes.
+- The foundation is committed at `474573e`. The active branch `feature/assignment-4-part-1` points to `0954655`, and `main` remains at `474573e`. There are no staged changes or configured remotes.
 - The approved dry run failed to resolve the PyPI hostname. Setup stopped with no Python lockfile, application source, frontend manifest, or running project services. See [verification](../docs/verification.md) for the command and exact error.
 
 ## Outstanding decisions and next task
 
-- Review the complete Prompt 2 changes before authorizing a commit. The working tree has four modified documentation files and 14 untracked source, test, configuration, and dependency files. The index has no staged changes.
+- Review the Prompt 3 changes and verification evidence before authorizing a commit. Live Yahoo Finance connectivity, SQLite persistence, candlestick charting, market-data WebSockets, and replay remain pending.
 - Later design decisions include the candle interval and completion rule, stale-data threshold, provider volume mapping, replay order and pacing, and SQLite runtime file location. Keep the course disclosure current as tools or models change.
 
 ## Prompt 2A connectivity retry
