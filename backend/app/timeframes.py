@@ -1,5 +1,6 @@
 """Aggregate one-minute AAPL snapshots within the regular exchange session."""
 
+from bisect import bisect_left
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 from functools import lru_cache
@@ -25,7 +26,7 @@ class CandleMetadata(TypedDict):
 
 
 class HistoryResponse(TypedDict):
-    symbol: Literal["AAPL"]
+    symbol: str
     interval: Interval
     as_of: str
     candles: list[CandleData]
@@ -51,8 +52,9 @@ def _source_minute(candle: CandleData) -> datetime:
 
 def aggregate_minutes(
     minutes: Iterable[CandleData], *, interval: Interval, as_of: datetime,
+    symbol: str = SYMBOL, touched_minutes: set[str] | None = None,
 ) -> HistoryResponse:
-    """Group an as-of snapshot containing at most one candle per source minute."""
+    """Group one candle per source minute, optionally showing only touched buckets."""
     if as_of.utcoffset() != timedelta(0):
         raise ValueError("Evaluation time must be timezone-aware UTC.")
     width = INTERVAL_MINUTES[interval] * MINUTE
@@ -61,6 +63,7 @@ def aggregate_minutes(
     sessions: dict[date, tuple[datetime, datetime] | None] = {}
     seen: set[datetime] = set()
     groups: dict[tuple[datetime, datetime], list[CandleData]] = {}
+    touched = sorted(touched_minutes) if touched_minutes is not None else None
     for stamp, candle in sorted(
         ((_source_minute(candle), candle) for candle in minutes),
         key=lambda entry: entry[0],
@@ -96,6 +99,10 @@ def aggregate_minutes(
     metadata: list[CandleMetadata] = []
     for (start, end), rows in groups.items():
         timestamp = utc_text(start)
+        if touched is not None:
+            index = bisect_left(touched, timestamp)
+            if index == len(touched) or touched[index] >= utc_text(end):
+                continue
         volumes = [row["volume"] for row in rows if row["volume"] is not None]
         expected = (end - start) // MINUTE
         candles.append({
@@ -113,4 +120,4 @@ def aggregate_minutes(
             "expected_minutes": expected,
             "is_complete": as_of >= end,
         })
-    return {"symbol": SYMBOL, "interval": interval, "as_of": utc_text(as_of), "candles": candles, "metadata": metadata}
+    return {"symbol": symbol, "interval": interval, "as_of": utc_text(as_of), "candles": candles, "metadata": metadata}

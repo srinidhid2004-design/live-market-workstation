@@ -563,3 +563,102 @@ The run made no Yahoo request. Actual live AAPL receipt remains pending for the 
 ### Live check gate
 
 The opt-in path and the observation-to-chart trace are ready for a separately authorized integrated attempt during an active regular session. Prompt 05 established Yahoo DNS and WebSocket connectivity in normal PowerShell and timed out before receipt. Actual live AAPL receipt and display remain unverified. See the [integrated check evidence requirements](design-pipeline.md#integrated-live-check).
+
+## Prompt 09 - Read-only SQLite replay
+
+Preflight found a clean `feature/assignment-4-part-1` and empty index at `fd1df32ffdc1e6b1ec786a2174e6bf3edda85ac6` (`Stream market candles to dashboard`). `main` was `474573e81efca7b4921cd602f4dee7803f804f36`. There was no remote, listener on ports 8000 or 5173, or tracked SQLite file or sidecar. The full `prompts/` tree matched the foundation commit. All 40 Python pins and 133 applicable frontend package versions matched the locks. The remaining 50 frontend entries were optional packages for other platforms.
+
+### Constructed session and independent expectation
+
+The fixture uses `constructed_test` observations for AAPL on November 9, 2026. `day_volume` is explicitly defined as cumulative shares for this fixture. The selected receipt range is `[14:30:00Z, 14:32:00Z)`. ID 1 supplies the pre-minute baseline and is outside the playback range.
+
+| ID | Source UTC | Receipt UTC | Price | Cumulative shares | Role |
+| --- | --- | --- | ---: | ---: | --- |
+| 1 | 14:29:55 | 14:29:59 | 99 | 1,000 | Baseline |
+| 2 | 14:30:05 | 14:30:06 | 100 | 1,000 | First selected observation |
+| 3 | 14:31:04 | 14:31:05 | 110 | Unknown | Next minute |
+| 4 | 14:30:40 | 14:31:07 | 109 | 1,000 | Late arrival with verified event identity |
+| 5 | 14:30:40 | 14:31:09 | 98 | 1,000 | Independent observation at the same source time |
+| 6 | 14:30:40 | 14:31:11 | 105 | 1,000 | Verified correction of ID 4 |
+
+The fixture inspector queries SQLite directly. For the final 14:30 minute, it excludes the superseded row and orders current rows by source time and ID, yielding IDs 2, 5, and 6. The last is ID 6 at 105. Its cumulative 1,000 minus the baseline 1,000 gives 0 shares. The 14:31 row closes at 110 with unknown volume. The fixture has six saved rows and schema version 1. Its SHA-256 before replay was `824796bdb1735671dc73e27214e514829bc5500ab68627db2a250dc79778382a`.
+
+### Replay results
+
+The in-process FastAPI tests opened the app without an upstream provider. Chrome used the production Vue bundle with its HTTP and WebSocket requests routed to that app over a local test harness. Playback paused after ID 2 for longer than the maximum scheduled gap, resumed at 4×, and finished. A reset cleared the chart. The second run emitted the same frames and finished with the same candles. The backend tests also compared two full runs at 4× and 2×.
+
+| Evidence | First run | Second run |
+| --- | --- | --- |
+| Emitted observation IDs | `2, 3, 4, 5, 6` | `2, 3, 4, 5, 6` |
+| 14:30 candle closes at each step | `100, 100, 109, 98, 105` | `100, 100, 109, 98, 105` |
+| Final 14:30 OHLC and displayed volume | `100/105/98/105`, `0 shares` | `100/105/98/105`, `0 shares` |
+| Final 14:31 close and displayed volume | `110`, `Unavailable` | `110`, `Unavailable` |
+| SQLite after replay | Six rows, schema version 1, same SHA-256 | Six rows, schema version 1, same SHA-256 |
+
+ID 4 arrived after the 14:31 candle appeared, then changed the earlier 14:30 candle. ID 5 remained independent at the same source time. ID 6 replaced ID 4, so the high fell from 109 to 105 and the low remained 98. Both candles were complete at the selection end. An empty selection displayed `No recorded observations exist for this selection.` The backend Yahoo provider call count was zero, and Chrome made no external request during the replay check. The constructed evidence covers the replay mechanism. Actual live receipt and replay from a captured Yahoo session remain pending.
+
+### Preliminary verification
+
+| Check | Observed |
+| --- | --- |
+| Focused candle and replay tests | All 17 existing candle tests passed. The initial 10 replay tests passed, covering selection, empty and missing databases, URI and `query_only` enforcement, receipt ties and clock rollback, pause and resume, repeatability, and rejection while a provider is configured. The final suite added WAL refusal and a five-minute exchange-alignment assertion. |
+| `./.venv/Scripts/python.exe -B -m unittest discover -s tests -v` from `backend/` | All 79 tests passed in 18.433 seconds. The restricted shell used the process-local polling loop through `IsolatedAsyncioTestCase.loop_factory` in place of the Windows socket-pair loop. No application or test file contains that workaround. The first focused runner used the deprecated asyncio event-loop policy API. The final run used `loop_factory` and emitted one non-failing asyncio slow-task diagnostic. A separate timeframe run reported the pinned calendar's pandas deprecation warning. |
+| `backend/.venv/Scripts/python.exe -B -m pip check` | `No broken requirements found.` |
+| Frontend tests, lint, and build | Playwright listed five tests across two specs. The three routed Prompt 08 Chrome regressions and the new stale-response and retired-socket test passed. ESLint passed with zero warnings. Vite 7.3.8 built 23 modules. |
+| Chrome routed to the in-process replay API | The preliminary harness matched `Paused` case-sensitively while the status was `Replay paused.`. Correcting the harness assertion allowed the full check to pass with no page or console errors. The separate stale-response harness also passed after its socket listener was attached to the actual routed instance. |
+| `npm.cmd --prefix .\frontend run test:connection -- --global-timeout=20000 --output=.cache/prompt09-playwright` | The restricted shell timed out during Vite setup and teardown before browser assertions. A bounded TCP probe returned `EACCES` on loopback. The environment also logged a non-failing `NO_COLOR` warning. |
+| `git diff --check` and workspace scans | No whitespace failures, credential or private-path matches in the new or changed files, tracked dependencies or generated artifacts, runtime SQLite files or sidecars, or project port listeners. Dependency manifests, locks, and instructor prompts match their preflight versions. |
+
+### Replay browser AutoLoop
+
+The student reported three normal-PowerShell runs with four of five tests passing. The two-run replay test stopped at exactly 45.0 seconds each time because the suite's per-test deadline was 45 seconds. The 120-second global deadline applies to the run. After the timeout the old cleanup attempted an HTTP request with the disposed Playwright request fixture, producing `Target page, context or browser has been closed`. The failed run left Vite listening on port 5173. A fresh listener check before editing found both ports free, so there was no listener PID to inspect or stop.
+
+The saved failure snapshot showed Replay still ready, the range filled, and the socket disconnected. A focused Chrome check against the Vue bundle found zero matches for `getByLabel('Playback speed', { exact: true })` and one for the exact accessible combobox name. The test now uses the combobox locator. It sets its own 75-second deadline to allow Windows startup, the 2.2-second pause check, both replay runs, and repeated SQLite inspections. The suite default stays 45 seconds and the full-run command remains bounded at 120 seconds. The replay, database, accessibility, console, and stale-update assertions are preserved.
+
+Cycle 1 moved Uvicorn teardown into a separate fixture timeout slot. At that stage, closing the worker's stdin pipe signaled the Python interpreter to stop. Cycle 3 restored the direct launcher. The fixture waits for closure, checks port 8000, and removes the disposable database and its directory. The other browser tests share the backend helper. Vite runs inside the Playwright runner and closes on setup error or suite teardown.
+
+| Check | Observed |
+| --- | --- |
+| Owned backend failure cleanup probe | A Windows venv probe confirmed the launcher and interpreter have different PIDs. A direct `taskkill` diagnostic was denied in the restricted shell. The cycle 1 helper closed the owned interpreter through stdin EOF in about 4.1 seconds during restricted startup. |
+| Replay browser assertions with Chrome and the in-process FastAPI app | Both replays, the deliberate pause, SQLite hash/count/schema comparison, empty selection, and zero Yahoo calls passed. Two preliminary versions of the temporary harness failed on a missing `healthUrl` binding and its inline quoting. The corrected harness passed with no unexpected browser errors. |
+| Other browser checks | The three routed Prompt 08 Chrome checks passed. The replay delayed-coverage and retired-socket test body passed in Chrome. Playwright listed all five tests. |
+| Syntax checks, ESLint, production build, and `git diff --check` | Passed. ESLint reported zero warnings and Vite built 23 modules. |
+| Full suite with the 120-second global limit | The restricted shell returned `EACCES` at Vite's loopback readiness request before browser assertions. No listener remained on ports 8000 or 5173. |
+
+#### AutoLoop cycle 2 - Backend readiness
+
+The next normal-PowerShell run passed two of five tests. Both fully routed tests passed. In the other three tests, Vite started and Uvicorn reported that it was listening on `127.0.0.1:8000`. The shared readiness poll returned `0` until its ten-second timeout, with no incoming `/api/health` request in Uvicorn's log. The previous helper converted every request exception to `0`, so the original exception category is unavailable. Cleanup released ports 8000 and 5173.
+
+The shared helper now uses Node HTTP directly against `127.0.0.1:8000/api/health`. It requires HTTP 200 and the exact `{"status":"healthy"}` response bytes. Each attempt has at most one second within a single ten-second startup deadline. Final failures report the last probe category. The functional endpoint assertions still use Playwright's request fixture. The earlier replay locator, scoped 75-second timeout, 45-second suite default, 120-second global limit, and owned-process shutdown and port checks remain in place.
+
+A focused Node check with mocked HTTP and child-process events covered retries after refusal and HTTP 503, rejection of extra or missing body bytes, a stalled response, acceptance of the exact split body, and a safe `EACCES` diagnostic after about ten seconds. JavaScript syntax, ESLint, the production build, and `git diff --check` passed. Playwright still lists five tests. A separate loopback probe returned `EACCES`, so the full suite was not attempted in the restricted shell. Neither project port had a listener after verification.
+
+#### AutoLoop cycle 3 - Direct Uvicorn launcher
+
+The next normal-PowerShell run again passed two of five tests. In all three startup failures, Uvicorn logged that it was listening on `127.0.0.1:8000`, but the Node HTTP probe received `ECONNREFUSED` throughout the ten-second deadline. No `/api/health` request reached Uvicorn. Cleanup released ports 8000 and 5173. These failures followed the switch to the inline Python launcher and stdin watcher. The logs do not establish why the listener was unreachable.
+
+The shared test helper again starts the venv interpreter with `-B -m uvicorn`, the requested app import, `--factory` for factory apps, `--host 127.0.0.1 --port 8000`, and `--timeout-graceful-shutdown 2`. The inline program and watcher were removed. The ten-second Node probe still requires HTTP 200 and the exact health body. On Windows, the hidden venv launcher has no reliable graceful signal through Node, so teardown uses bounded `taskkill /PID <owned PID> /T /F` while the owned tree is still identifiable. Where POSIX signals are available, teardown attempts `SIGTERM` before a bounded fallback. The helper awaits closure and then checks port 8000. The Vite global setup and the 75-, 45-, and 120-second test limits remain in place.
+
+The installed Uvicorn CLI confirmed all launch options. A focused Node check with mocked process and network events passed for the default, recorded-demo, and replay targets. It verified exact launch arguments, exact HTTP health bytes, shutdown of the spawned PID tree, and port-check ordering after closure. JavaScript syntax, ESLint, the production build, and `git diff --check` passed. Playwright listed all five tests. The restricted loopback probe returned `EACCES`. Neither project port had a listener after verification in that shell.
+
+### Prompt 09 final normal-PowerShell SmokeTest
+
+The student reported that the full Playwright suite passed **five tests in 41.0 seconds** after cycle 3. The command below is the repeatable SmokeTest from the project root with ports 8000 and 5173 free.
+
+```powershell
+npm.cmd --prefix .\frontend run test:connection -- --global-timeout=120000
+```
+
+| Test | Observed |
+| --- | --- |
+| Health, backend outage, and recovery | Passed. The intentional backend outage produced the expected HTTP failure. |
+| Recorded feed update and recovery | Passed. |
+| Timeframe stale-response and retired-WebSocket handling | Passed. |
+| Two-run replay | Passed in 15.7 seconds. An independent SQLite check matched close 105 and volume 0. Both runs emitted IDs `2, 3, 4, 5, 6` in the same order and preserved six rows. |
+| Replay stale-response and retired-WebSocket handling | Passed. |
+
+The replay database SHA-256 remained `824796bdb1735671dc73e27214e514829bc5500ab68627db2a250dc79778382a`. Yahoo and external request counts were zero. Chrome reported no unexpected application errors. Vite's expected WebSocket `ECONNRESET` during teardown did not fail the run.
+
+Immediately after Playwright exited, Windows briefly displayed ports 8000 and 5173 as listening. Port 8000 disappeared first. Port 5173 briefly appeared with owner PID 0, which was left alone. After a bounded delay, `Get-NetTCPConnection` returned no listeners on either project port, `netstat` showed no 5173 listener, and `Test-NetConnection 127.0.0.1 -Port 5173` returned `False` for `TcpTestSucceeded`. Cleanup is verified.
+
+Replay of a captured Yahoo session remains pending because no qualifying live Yahoo observation has been received.

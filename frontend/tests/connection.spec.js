@@ -1,54 +1,13 @@
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
+import { backendDir, backendService, healthUrl as backendUrl, python } from './backend-service.js'
 
-const backendDir = fileURLToPath(new URL('../../backend/', import.meta.url))
-const python = fileURLToPath(
-  new URL('../../backend/.venv/Scripts/python.exe', import.meta.url),
-)
-const backendUrl = 'http://127.0.0.1:8000/api/health'
 const expectedBody = '{"status":"healthy"}'
 
-function backendService(request, app = 'app.main:app', extraArgs = [], extraEnv = {}) {
-  let backend
-  let backendClosed
-
-  async function startBackend() {
-    backend = spawn(
-      python, ['-B', '-m', 'uvicorn', app, '--host', '127.0.0.1', '--port', '8000', ...extraArgs],
-      { cwd: backendDir, stdio: 'inherit', windowsHide: true, env: { ...process.env, ...extraEnv } },
-    )
-    const child = backend
-    backendClosed = new Promise((resolve) => {
-      child.once('close', resolve)
-    })
-    let spawnError
-    child.once('error', (error) => { spawnError = error })
-    await expect.poll(async () => {
-      if (spawnError) throw spawnError
-      if (child.exitCode !== null) throw new Error('Uvicorn exited during startup.')
-      try {
-        return (await request.get(backendUrl, { timeout: 1000 })).status()
-      } catch {
-        return 0
-      }
-    }, { timeout: 10_000 }).toBe(200)
-  }
-
-  async function stopBackend() {
-    if (!backend) return
-    backend.kill()
-    await backendClosed
-    backend = undefined
-  }
-
-  return { startBackend, stopBackend }
-}
-
 test('local connection shows health, backend outage, and recovery', async ({ page, request }) => {
-  const { startBackend, stopBackend } = backendService(request)
+  const { startBackend, stopBackend } = backendService()
   const pageErrors = []
   const consoleErrors = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
@@ -195,7 +154,7 @@ test('local connection shows health, backend outage, and recovery', async ({ pag
 test('recorded input updates chart through FastAPI and reports upstream recovery', async ({ page, request }) => {
   const directory = await mkdtemp(join(backendDir, 'market-feed-smoke-'))
   const database = join(directory, 'observations.sqlite')
-  const { startBackend, stopBackend } = backendService(request, 'tests.market_feed_demo:create_demo_app', ['--factory'], {
+  const { startBackend, stopBackend } = backendService('tests.market_feed_demo:create_demo_app', ['--factory'], {
     MARKET_FEED_TEST_DB: database,
   })
   const errors = []

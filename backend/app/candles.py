@@ -1,5 +1,6 @@
 """Form one-minute UTC candles from the current saved observation versions."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import groupby, pairwise
@@ -92,6 +93,16 @@ def form_candles(
         if as_of.utcoffset() != timedelta(0) or as_of > evaluated_at:
             raise ValueError("The UTC receipt cutoff must be at or before evaluation time.")
         observations = _visible_versions(store, source_name, ticker, as_of.astimezone(UTC))
+    return form_current_candles(
+        observations, evaluated_at=evaluated_at, cumulative_volume_field=cumulative_volume_field,
+    )
+
+
+def form_current_candles(
+    observations: Iterable[StoredObservation], *, evaluated_at: datetime,
+    cumulative_volume_field: str | None = None,
+) -> list[Candle]:
+    """Build UTC minutes from one source and symbol's source-ordered current rows."""
     baseline: int | None = None
     candles: list[Candle] = []
     for minute, rows in groupby(observations, key=_minute_start):

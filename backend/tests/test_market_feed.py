@@ -69,12 +69,11 @@ class FakeFeed:
 class BrowserSocket:
     """A bounded ASGI peer that uses no listener or network socket."""
 
-    def __init__(self, app, query: str) -> None:
+    def __init__(self, app, query: str, *, path: str = "/api/market-feed") -> None:
         self.incoming: asyncio.Queue[dict] = asyncio.Queue()
         self.outgoing: asyncio.Queue[dict] = asyncio.Queue()
         self.on_message: Callable[[dict], None] | None = None
         self.incoming.put_nowait({"type": "websocket.connect"})
-        path = "/api/market-feed"
         self.task = asyncio.create_task(app({
             "type": "websocket",
             "asgi": {"version": "3.0", "spec_version": "2.4"},

@@ -9,6 +9,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api/market-feed': { target: 'http://127.0.0.1:8000', ws: true },
+      '/api/replay/stream': { target: 'http://127.0.0.1:8000', ws: true },
       '/api': 'http://127.0.0.1:8000',
     },
   },

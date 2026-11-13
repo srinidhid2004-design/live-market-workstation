@@ -2,6 +2,14 @@
 
 ## Checkpoint
 
+Prompt 09 adds read-only SQLite replay to the dashboard's existing chart. Run the default backend with the upstream feed off and open **Replay**. A bounded receipt-time selection advances in saved observation ID order. Playback supports pause, resume, reset, and three speeds. Late rows and linked revisions affect the chart only when their IDs are reached. See the [replay contract](../docs/design-pipeline.md#prompt-09-recorded-session-replay) and [verification](../docs/verification.md#prompt-09---read-only-sqlite-replay).
+
+The final normal-PowerShell SmokeTest passed all five Playwright tests in 41.0 seconds. The health/outage/recovery, recorded feed update/recovery, timeframe stale-response and retired-WebSocket, two-run replay, and replay stale-response and retired-WebSocket tests all passed. The two-run replay test took 15.7 seconds. An independent SQLite query matched close 105 and volume 0 for 14:30 UTC. Both runs emitted `2, 3, 4, 5, 6` and preserved six rows. The database SHA-256 remained `824796bdb1735671dc73e27214e514829bc5500ab68627db2a250dc79778382a`. Yahoo and external request counts were zero.
+
+Chrome reported no unexpected application errors. The intentional backend outage produced the expected HTTP failure, and Vite's teardown WebSocket `ECONNRESET` was non-failing. Both ports briefly appeared as listening after Playwright exited. Port 8000 disappeared first. Port 5173 briefly showed owner PID 0, which was left alone. After a bounded delay, `Get-NetTCPConnection` found no listeners on either port, `netstat` found no 5173 listener, and `Test-NetConnection 127.0.0.1 -Port 5173` returned `False` for `TcpTestSucceeded`. Cleanup is verified. See the [final SmokeTest](../docs/verification.md#prompt-09-final-normal-powershell-smoketest).
+
+The earlier AutoLoop cycles corrected the playback-speed locator, isolated teardown from the browser request context, and restored the direct Uvicorn launcher with exact-body Node readiness. All 79 backend tests and the routed Chrome checks passed during the checkpoint. See the [AutoLoop record](../docs/verification.md#replay-browser-autoloop).
+
 Prompt 08 connects the existing AAPL chart to `/api/market-feed` for all five timeframes. Default startup uses the synthetic CSV. The recorded SmokeTest injects constructed observations and uses a disposable database. The opt-in Yahoo provider uses one lifecycle-owned AAPL subscription per backend process. The coordinator commits observations before publishing backend-calculated candles. The chart displays downstream connection and upstream feed status separately, and exposes timestamps, observation ID, coverage, and completion. See the [protocol](../docs/design-pipeline.md#prompt-08-market-feed-websocket) and [Prompt 08 verification](../docs/verification.md#prompt-08---market-feed-websocket).
 
 All 67 backend tests and three routed Chrome checks passed. The post-fix normal-PowerShell SmokeTest then passed all three Playwright tests in 24.0 seconds. It verified health and backend outage recovery, `Unavailable` for unknown volume, `0 shares` at 14:31 UTC, and the recorded update from close 100 to 103 for SQLite observation ID 2. The browser stayed connected through the upstream outage, recovery added the next candle, and the timeframe test rejected delayed HTTP responses and retired WebSocket updates.
@@ -33,7 +41,7 @@ Prompt 07 started at `54da86d` on `feature/assignment-4-part-1`, with `main` at 
 ## Outstanding decisions and next task
 
 - Actual live AAPL receipt remains pending for the separately authorized market-hours check. The final SmokeTest made no Yahoo request. Trace a qualifying Yahoo message through normalization, the persisted observation ID, the backend candle, the FastAPI WebSocket, and the visible chart. The Prompt 05 probe established connectivity and reached its bound before receiving a qualifying update.
-- Replay controls, replay order and pacing, and verified Yahoo volume semantics remain future work. Keep the course disclosure current as tools or models change.
+- Replay of a captured Yahoo session remains pending because no qualifying live Yahoo observation has been received. Yahoo volume semantics remain unverified. Keep the course disclosure current as tools or models change.
 
 ## Prompt 2A connectivity retry
 

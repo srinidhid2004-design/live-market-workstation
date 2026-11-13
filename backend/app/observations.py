@@ -98,6 +98,13 @@ class StoredObservation:
     revision_of: int | None
 
 
+def decode_stored_observation(row: sqlite3.Row) -> StoredObservation:
+    fields = dict(row)
+    fields["volume_fields"] = json.loads(fields.pop("volume_fields_json"))
+    fields["source_fields"] = json.loads(fields.pop("source_fields_json"))
+    return StoredObservation(**fields)
+
+
 def _utc_text(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
@@ -256,13 +263,7 @@ class ObservationStore:
             raise ValueError("Order must be 'receipt' or 'source'.")
         query = READ_BY_RECEIPT if order == "receipt" else READ_BY_SOURCE
         with closing(self._connect()) as connection:
-            records = []
-            for row in connection.execute(query, (current_only,)):
-                fields = dict(row)
-                fields["volume_fields"] = json.loads(fields.pop("volume_fields_json"))
-                fields["source_fields"] = json.loads(fields.pop("source_fields_json"))
-                records.append(StoredObservation(**fields))
-            return records
+            return [decode_stored_observation(row) for row in connection.execute(query, (current_only,))]
 
 
 def main() -> None:

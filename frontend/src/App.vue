@@ -6,6 +6,7 @@ const pending = ref(false)
 const message = ref('')
 const status = ref(null)
 const payload = ref('')
+const replay = ref(false)
 
 async function checkConnection() {
   if (pending.value) return
@@ -53,7 +54,11 @@ async function checkConnection() {
       <p v-if="status !== null">HTTP {{ status }}</p>
       <pre v-if="payload">{{ payload }}</pre>
     </div>
-    <CandleHistory />
+    <button class="mode-switch" type="button" @click="replay = !replay">
+      {{ replay ? 'Back to market candles' : 'Open replay' }}
+    </button>
+    <CandleHistory v-if="replay" key="replay" replay />
+    <CandleHistory v-else key="market" />
   </main>
 </template>
 
@@ -85,6 +90,15 @@ button {
 
 button:disabled {
   opacity: 0.65;
+}
+
+:focus-visible {
+  outline: 3px solid #176e80;
+  outline-offset: 3px;
+}
+
+.mode-switch {
+  margin-top: 0.75rem;
 }
 
 pre {

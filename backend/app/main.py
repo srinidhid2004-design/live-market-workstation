@@ -1,6 +1,6 @@
 import asyncio
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,12 +13,18 @@ from .candles import MINUTE
 from .history import load_candles
 from .market_feed import DataMode, MarketFeed, ObservationProvider
 from .observations import DEFAULT_DATABASE, ObservationStore
+from .replay import ReplayArchive
+from .replay_routes import replay_router
 from .timeframes import INTERVAL_MINUTES, SYMBOL, HistoryResponse, Interval, aggregate_minutes, session_calendar
 
 
 HISTORY_FILE = Path(__file__).resolve().parents[1] / "data" / "sample-candles.csv"
 UTC_TIME = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?(?:Z|\+00:00)")
 SEND_SECONDS = 5
+LOCAL_ORIGINS = frozenset({
+    "http://127.0.0.1:5173", "http://localhost:5173",
+    "http://127.0.0.1:8000", "http://localhost:8000",
+})
 
 
 class MarketHistoryResponse(HistoryResponse):
@@ -69,6 +75,7 @@ def create_app(
     *, provider: ObservationProvider | None = None,
     database_path: Path = DEFAULT_DATABASE,
     clock: Callable[[], datetime] = utc_now,
+    replay_cumulative_fields: Mapping[str, str] | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -82,6 +89,10 @@ def create_app(
             await feed.stop()
 
     application = FastAPI(title="Live Market Workstation", lifespan=lifespan)
+    application.include_router(replay_router(
+        ReplayArchive(database_path, cumulative_fields=replay_cumulative_fields),
+        enabled=provider is None, allowed_origins=LOCAL_ORIGINS, utc_pattern=UTC_TIME,
+    ))
 
     @application.get("/api/health")
     async def health() -> dict[str, str]:
@@ -112,10 +123,7 @@ def create_app(
         symbol, interval = query.get("symbol", SYMBOL), query.get("interval", "1m")
         selection = cast(Interval, interval) if interval in INTERVAL_MINUTES else None
         origin = socket.headers.get("origin")
-        if origin is not None and origin not in {
-            "http://127.0.0.1:5173", "http://localhost:5173",
-            "http://127.0.0.1:8000", "http://localhost:8000",
-        }:
+        if origin is not None and origin not in LOCAL_ORIGINS:
             await socket.close(code=1008)
             return
         await socket.accept()

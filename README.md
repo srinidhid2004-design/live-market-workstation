@@ -20,7 +20,7 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | --- | --- | --- |
 | Local shell | Windows and PowerShell | Windows x64, build 26300, PowerShell 7.6.9 |
 | Backend | Python with type hints | Python 3.14.7 runs directly. The Windows `python` and `py` aliases failed in the project shell. |
-| API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | HTTP routes are `/api/health` and `/api/history`. AAPL chart updates use `/api/market-feed`. |
+| API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | HTTP routes include `/api/health`, `/api/history`, and `/api/replay/coverage`. Chart updates use `/api/market-feed` or `/api/replay/stream`. |
 | Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed the Prompt 06 recorder and restart checks with constructed observations. |
 | Market feed | Yahoo Finance via yfinance | `yfinance==1.8.0` and `websockets==17.4` import in `backend/.venv`. The normal-PowerShell AAPL probe resolved DNS and opened the WebSocket. It timed out after 25 seconds without a qualifying update. |
 | Exchange sessions | `exchange-calendars==4.13.2` | AAPL requests `XNAS`, which uses the shared `XNYS` U.S. equity schedule. The alias has no separate Nasdaq-specific exception schedule. |
@@ -96,6 +96,14 @@ The chart displays source and data mode, source and receipt times, server-calcul
 
 See the [WebSocket contract](docs/design-pipeline.md#prompt-08-market-feed-websocket) and [Prompt 08 results](docs/verification.md#prompt-08---market-feed-websocket).
 
+### Replay recorded observations
+
+Stop the live-mode backend and start the default `app.main:app` backend from the run table. Open the dashboard and choose **Open replay**. Select a recorded symbol and source, then enter the UTC start and end in ISO 8601 format, such as `2026-11-09T14:30:00Z`. The start is inclusive and the end is exclusive. The range selects original backend receipt times and can cover up to 24 hours and 1,000 observations. The replay chart uses one-minute candles. Its timeframe control is disabled while replay is open.
+
+Choose `1×`, `2×`, or `4×` and start the replay. Pause freezes playback. Resume continues from the same observation, and reset clears the chart so the same selection can run again. The backend uses stored observation IDs for arrival order. A late observation or verified revision changes the chart when its turn arrives. The chart shows **Replay**, the original source and receipt times, observation ID, and whether the candle is forming or complete.
+
+Replay reads the saved rollback-journal SQLite database without writing to it. Stop any external writer before replaying. A clean checkout or an empty range displays a no-observations message. The browser SmokeTest creates a separate constructed database and removes it afterward. Actual Yahoo receipt and replay from a captured Yahoo session remain pending. See the [replay contract](docs/design-pipeline.md#prompt-09-recorded-session-replay) and [fixture evidence](docs/verification.md#prompt-09---read-only-sqlite-replay).
+
 ### Integrated live check
 
 During the separately authorized AAPL check, the opt-in startup command from `backend/` is:
@@ -122,9 +130,9 @@ The `observations` table stores an immutable ID that doubles as receipt order, s
 
 `app.candles.form_candles()` reads current versions for one source and ticker. It groups observations by UTC source minute, including the minute start and excluding the next boundary. Prices are ordered by source time and then by immutable observation ID, which is the recorder's receipt order. Empty minutes produce no candle. Recalculating after a late observation or a verified correction uses the updated snapshot. Earlier observation versions remain in the recorder for audit.
 
-Each candle has exactly six market-data fields in `data` (`timestamp`, `open`, `high`, `low`, `close`, `volume`) and a separate `is_complete`. The caller supplies a UTC evaluation time. Completion begins at the next minute boundary and does not prevent a later recalculation from changing OHLCV. An optional `as_of` cutoff selects the latest saved revision received by that time and excludes later source times. Higher timeframes can consume this snapshot when saved history is wired into the application.
+Each candle has exactly six market-data fields in `data` (`timestamp`, `open`, `high`, `low`, `close`, `volume`) and a separate `is_complete`. The caller supplies a UTC evaluation time. Completion begins at the next minute boundary and does not prevent a later recalculation from changing OHLCV. An optional `as_of` cutoff selects the latest saved revision received by that time and excludes later source times. The same minute calculation feeds the regular-session timeframe aggregator for live and replay data.
 
-For a field explicitly identified as a cumulative session total, volume is the last valid total in the minute minus the most recent valid total strictly before the minute. A missing or invalid in-minute value, missing baseline, or observed decrease yields `None` (JSON `null`). A known zero is `0`. The constructed fixture uses `day_volume` for this calculation. Yahoo's live volume semantics remain unverified. The Python logic is available for future integration, and `/api/history` continues to serve the synthetic CSV. See the [Prompt 07 checks](docs/verification.md#prompt-07---one-minute-candles).
+For a field explicitly identified as a cumulative session total, volume is the last valid total in the minute minus the most recent valid total strictly before the minute. A missing or invalid in-minute value, missing baseline, or observed decrease yields `None` (JSON `null`). A known zero is `0`. The constructed fixture uses `day_volume` for this calculation. Yahoo's live volume semantics remain unverified. See the [Prompt 07 checks](docs/verification.md#prompt-07---one-minute-candles).
 
 ## Project map
 

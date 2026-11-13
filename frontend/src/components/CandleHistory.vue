@@ -2,13 +2,17 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { CandlestickSeries, createChart, HistogramSeries } from 'lightweight-charts'
 import { intervals, symbol, useMarketFeed } from '../marketFeed.js'
+import { useReplayFeed } from '../replayFeed.js'
+import ReplayControls from './ReplayControls.vue'
 
+const props = defineProps({ replay: Boolean })
 const chartHost = ref(null)
 const candles = ref([])
 const selected = ref(null)
+const replay = props.replay ? useReplayFeed() : null
 const {
   interval, historyState, transport, feed, source, snapshot, upsert, retry,
-} = useMarketFeed()
+} = replay ?? useMarketFeed()
 const upColor = '#087f72'
 const downColor = '#b84045'
 const volumeFormat = new Intl.NumberFormat('en-US')
@@ -31,7 +35,7 @@ const sourceNames = {
   yahoo_finance: 'Yahoo Finance',
   constructed_test: 'Constructed test data',
 }
-const dataModes = { synthetic: 'Synthetic', recorded: 'Recorded', live: 'Live' }
+const dataModes = { synthetic: 'Synthetic', recorded: 'Recorded', live: 'Live', replay: 'Replay' }
 const transportLabels = { connecting: 'Connecting', connected: 'Connected', disconnected: 'Disconnected' }
 const feedLabels = {
   connecting: 'Connecting',
@@ -41,18 +45,23 @@ const feedLabels = {
   recorded: 'Recorded input',
 }
 const heading = computed(() => {
+  if (replay) return 'Replay'
   if (source.value?.mode === 'synthetic') {
     return interval.value === '1m' ? 'Synthetic one-minute sample' : 'Synthetic sample'
   }
   return 'Market candles'
 })
-const feedStatus = computed(() => (
-  transport.value === 'connected' ? feedLabels[feed.value?.feed_status] : 'Unknown'
-))
+const feedStatus = computed(() => {
+  if (replay?.available.value === true) return 'Recorded session — live feed off'
+  if (replay?.available.value === false) return 'Replay unavailable with a feed active'
+  return transport.value === 'connected' ? feedLabels[feed.value?.feed_status] : 'Unknown'
+})
 const sourceAge = computed(() => (
   Number.isFinite(feed.value?.age_seconds) ? `${Math.round(feed.value.age_seconds)} s` : 'Unavailable'
 ))
-const volumeUnit = computed(() => source.value?.name === 'synthetic_csv' ? ' shares' : '')
+const volumeUnit = computed(() => (
+  source.value?.name === 'synthetic_csv' || source.value?.volumeUnit === 'shares' ? ' shares' : ''
+))
 
 function utcLabel(seconds) {
   return `${dateFormat.format(seconds * 1000)} UTC`
@@ -137,7 +146,7 @@ watch(snapshot, (history) => {
   }
 }, { flush: 'sync' })
 
-watch(upsert, (event) => {
+if (upsert) watch(upsert, (event) => {
   if (!event) return
   ensureChart()
   const row = chartRow(event.candle, event.metadata)
@@ -161,26 +170,36 @@ onBeforeUnmount(() => chart?.remove())
 <template>
   <section aria-labelledby="history-heading" class="history">
     <h2 id="history-heading">{{ heading }}</h2>
+    <ReplayControls v-if="replay" :controls="replay" />
     <div class="timeframe">
       <label for="market-timeframe">Timeframe</label>
-      <select id="market-timeframe" v-model="interval">
+      <select id="market-timeframe" v-model="interval" :disabled="!!replay" :aria-describedby="replay ? 'replay-timeframe' : null">
         <option v-for="value in intervals" :key="value" :value="value">{{ value }}</option>
       </select>
+      <p v-if="replay" id="replay-timeframe" class="axis-label">Replay uses one-minute candles. Switch back to market candles to change the timeframe.</p>
     </div>
-    <dl aria-label="Market feed" class="feed-details" aria-live="polite">
-      <div><dt>Symbol</dt><dd>{{ symbol }}</dd></div>
+    <dl aria-label="Market feed" class="feed-details" :aria-live="replay ? null : 'polite'">
+      <div><dt>Symbol</dt><dd>{{ replay ? (replay.recording.value?.symbol ?? 'Unavailable') : symbol }}</dd></div>
       <div><dt>Interval</dt><dd>{{ interval }}</dd></div>
       <div><dt>Source</dt><dd>{{ sourceNames[source?.name] ?? source?.name ?? 'Unavailable' }}</dd></div>
       <div><dt>Data mode</dt><dd>{{ dataModes[source?.mode] ?? 'Unavailable' }}</dd></div>
       <div><dt>Feed status</dt><dd>{{ feedStatus }}</dd></div>
       <div><dt>WebSocket</dt><dd>{{ transportLabels[transport] }}</dd></div>
-      <div><dt>Source age</dt><dd>{{ sourceAge }}</dd></div>
-      <div><dt>Latest source time (UTC)</dt><dd>{{ feed?.latest_source_time ?? 'Unavailable' }}</dd></div>
-      <div><dt>Update source time (UTC)</dt><dd>{{ feed?.source_time ?? 'Unavailable' }}</dd></div>
-      <div><dt>Backend receipt time (UTC)</dt><dd>{{ feed?.receipt_time ?? 'Unavailable' }}</dd></div>
+      <template v-if="replay">
+        <div><dt>Selected UTC range</dt><dd>{{ replay.start.value || 'Unavailable' }} to {{ replay.end.value || 'Unavailable' }}</dd></div>
+        <div><dt>Playback speed</dt><dd>{{ replay.activeSpeed.value }}×</dd></div>
+        <div><dt>Original source time (UTC)</dt><dd>{{ feed?.source_time ?? 'Unavailable' }}</dd></div>
+        <div><dt>Original receipt time (UTC)</dt><dd>{{ feed?.receipt_time ?? 'Unavailable' }}</dd></div>
+      </template>
+      <template v-else>
+        <div><dt>Source age</dt><dd>{{ sourceAge }}</dd></div>
+        <div><dt>Latest source time (UTC)</dt><dd>{{ feed?.latest_source_time ?? 'Unavailable' }}</dd></div>
+        <div><dt>Update source time (UTC)</dt><dd>{{ feed?.source_time ?? 'Unavailable' }}</dd></div>
+        <div><dt>Backend receipt time (UTC)</dt><dd>{{ feed?.receipt_time ?? 'Unavailable' }}</dd></div>
+      </template>
       <div><dt>Observation ID</dt><dd>{{ feed?.observation_id ?? 'Unavailable' }}</dd></div>
     </dl>
-    <button v-if="transport === 'disconnected'" type="button" @click="retry">Reconnect feed</button>
+    <button v-if="!replay && transport === 'disconnected'" type="button" @click="retry">Reconnect feed</button>
     <p class="axis-label">Price and volume{{ volumeUnit ? ' (shares)' : '' }} · UTC</p>
     <p v-if="historyState" aria-live="polite">{{ historyState }}</p>
     <div ref="chartHost" class="chart" role="img" aria-label="Candlestick price and volume chart" />

@@ -36,7 +36,7 @@ Prompt 05 installed and verified yfinance 1.8.0 and websockets 17.4 for the cred
 | --- | --- |
 | Python receiver | The opt-in Yahoo source subscribes once to AAPL, captures UTC receipt time on frame receipt, and passes the decoded market fields to the existing normalizer. |
 | Observation recorder and SQLite | The coordinator commits each accepted observation before recomputing candles. The recorder preserves identity, revisions, source and receipt order, and supplied volume fields. |
-| Replay | A later checkpoint will add a cursor over saved observations and reconstruct candles using the same aggregation rules. |
+| Replay | Prompt 09 opens SQLite read-only and reconstructs candles from successive receipt-order prefixes. |
 | Candle aggregation | Prompt 07 forms one-minute UTC candles from saved observations. Prompt 07A derives regular-session timeframes from a one-minute snapshot. Prompt 08 shares that path between provider-backed history and WebSocket updates. |
 | FastAPI | Serve historical snapshots over HTTP and incremental changes over WebSocket. Include source, data mode, timestamps or age, feed status, and candle-completion status in the contract. |
 | Vue | Render candlesticks and volume with TradingView Lightweight Charts. Display live, synthetic sample, recorded, or replay mode and distinguish freshness and feed availability separately. Keep the last observed data clearly timestamped when the feed goes stale or becomes unavailable. |
@@ -48,7 +48,7 @@ Prompt 05 installed and verified yfinance 1.8.0 and websockets 17.4 for the cred
 - For replay, confirm the displayed data is marked as replay and compare reconstructed candles with the stored observations. For CSV practice, label the sample as synthetic. Neither replay nor a synthetic run supplies the graded live-stream evidence.
 - From a clean local start, verify the frontend reaches FastAPI, that the browser reports feed state, and that a stop and restart leaves stored observations available for replay.
 
-Decisions for later prompts include live provider volume mapping and replay order and pacing. The project is educational and non-advisory.
+Verified live provider volume mapping remains open. The project is educational and non-advisory.
 
 ## Prompt 06 observation identity and revisions
 
@@ -112,3 +112,27 @@ The timeframe selector aborts the previous HTTP request, closes the previous soc
 ### Integrated live check
 
 After separate approval, start one live-mode backend during an active regular session. Record the UTC attempt window and selected interval. Trace an observation whose source time falls within that session. Capture the normalized AAPL source time and price, the SQLite observation ID and receipt time, the WebSocket candle and metadata, and the matching values displayed in the chart. Match the ID in the socket message to its SQLite row and compare the displayed candle against the backend result for the same timestamp and interval. Check upstream loss with the page still connected and record what the two status fields show. Stop the live backend and verify its connection is closed. If the attempt receives no qualifying update, record the outcome and leave live receipt pending.
+
+## Prompt 09 recorded session replay
+
+The default backend can discover and replay its saved observation database. Replay is disabled when the backend has an upstream provider configured. SQLite opens with `mode=ro` and `PRAGMA query_only = ON`. Replay never creates a missing database, initializes its schema, or calls the observation recorder. Replay accepts the recorder's rollback-journal format. It rejects WAL-mode files before SQLite opens them to avoid creating sidecars. A short read transaction captures the selected rows and their pre-selection context consistently. The connection closes before playback, and reset reuses that in-memory selection.
+
+The selection combines one stored symbol and source with an inclusive UTC receipt start and exclusive receipt end. The backend advances the immutable observation IDs in ascending order. It keeps the original source and receipt timestamps even if the receipt clock went backward. The replay evaluation clock follows the greatest selected receipt time reached so far. Context can supply the opening state and cumulative baseline. It includes current versions before the first selected ID and same-source rows between selected IDs when the receipt clock went backward. The chart starts empty and shows only exchange buckets touched by selected arrivals, including earlier bars affected by late arrivals and the old bucket of a moved correction.
+
+Each arrival replaces a prior version only through its stored `revision_of` link. Same-time observations with no link are independent. The shared one-minute candle code places current rows by source time, then immutable ID. The shared exchange aggregation applies the project's regular U.S. equity calendar. Replay never reveals the final revision before its ID arrives. At completion the selection end becomes the evaluation time for candle-completion metadata. The Vue chart uses one minute during replay and explains why its timeframe control is disabled. Playback and candle completion are separate states.
+
+### Replay API and WebSocket
+
+`GET /api/replay/coverage` lists up to 64 recorded `(source, symbol)` choices, their UTC receipt bounds, and counts. The exclusive upper bound is the latest receipt plus one microsecond. The `available` flag indicates whether replay is enabled for this backend. An absent or empty database yields an empty list.
+
+`/api/replay/stream` validates `source`, `symbol`, `start`, `end`, `interval`, and `speed` before playback. It accepts up to 24 hours, 1,000 selected observations, and 4,000 additional context rows. A short range in a long recording can exceed the context limit and will be rejected. The backend supports the same five intervals as the market socket. An empty selection produces state `empty` and leaves the database untouched.
+
+Replay messages use version 1 candle snapshots and metadata with `data_mode: "replay"` and `feed_status: "off"`. Context includes the selection, position, speed, original observation ID and times, original integer source timestamp and unit, verified event and revision IDs, and stored volume fields. `volume_unit` is set only for a verified mapping. The constructed fixture declares cumulative `day_volume` in shares. Yahoo volume remains unknown.
+
+| Message type | Purpose |
+| --- | --- |
+| `replay_status` | Reports readiness, playing, pause, or an empty selection. |
+| `snapshot` | Reports the selected interval's chart after an arrival, a reset, or completion. Candle objects have the existing six fields. Coverage and completion remain in metadata. |
+| `error` | Reports `failed` with a bounded public message. |
+
+Send `{"action":"play","speed":4}` to start or resume at `1×`, `2×`, or `4×`. The server caps each recorded inter-arrival gap at two seconds before dividing it by speed. Pause keeps the remaining delay. Reset returns to `ready` and clears the chart. Speed changes wall-clock pacing only. The server allows four replay sockets per process, with a 45-minute limit and at most 4,096 small commands per socket. A delayed message from a closed socket or a retired coverage request cannot update the current chart.
