@@ -6,6 +6,8 @@ Assignment 4 is cumulative. Part 4.1 establishes market-data observation, visual
 
 Prompt 01 established the project structure. Student-added Prompt 01a covers governance, AI disclosure, and the local Git baseline. [Instructor Prompt 2](prompts/02-connect-vue-and-fastapi.md) is verified. The Vue connection check reaches FastAPI through Vite, shows an unavailable state when the backend stops, and recovers when it restarts. See [AI-USE.md](AI-USE.md) for the distinction between development assistance and future application AI features.
 
+Assignment 4.1 verified live Yahoo Finance receipt for AAPL and offline replay of the same recorded observation. The final report, public repository publication, video, and Canvas submission remain pending. See the [evidence record](docs/verification.md#supplemental-prompt-08a---bounded-live-evidence).
+
 ## Assignment 4.1 goals
 
 - Receive actual AAPL updates from Yahoo Finance through the yfinance WebSocket client. Use UTC internally for source timestamps, receipt timestamps, and candle boundaries.
@@ -22,7 +24,7 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | Backend | Python with type hints | Python 3.14.7 runs directly. The Windows `python` and `py` aliases failed in the project shell. |
 | API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | HTTP routes include `/api/health`, `/api/history`, and `/api/replay/coverage`. Chart updates use `/api/market-feed` or `/api/replay/stream`. |
 | Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed the Prompt 06 recorder and restart checks with constructed observations. |
-| Market feed | Yahoo Finance via yfinance | `yfinance==1.8.0` and `websockets==17.4` import in `backend/.venv`. The normal-PowerShell AAPL probe resolved DNS and opened the WebSocket. It timed out after 25 seconds without a qualifying update. |
+| Market feed | Yahoo Finance via yfinance | `yfinance==1.8.0` and `websockets==17.4` import in `backend/.venv`. The integrated normal-PowerShell check captured 226 unique AAPL observations in one subscription. |
 | Exchange sessions | `exchange-calendars==4.13.2` | AAPL requests `XNAS`, which uses the shared `XNYS` U.S. equity schedule. The alias has no separate Nasdaq-specific exception schedule. |
 | Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The Vue, Vite, and Lightweight Charts 5.3.0 pins are in `frontend/package.json`. |
 | Package tools | pip for Python and npm for the frontend | pip 26.2.1 runs in the existing environment. The student completed the npm install from the official registry in normal PowerShell. The 40-pin Python lock was checked against the installed distributions. |
@@ -48,8 +50,6 @@ $projectPython = Join-Path $env:LOCALAPPDATA 'Python\pythoncore-3.14-64\python.e
 ```
 
 For an existing environment, keep `backend/.venv` and run only the pip commands above in normal PowerShell if installation is needed.
-
-Prompt 05 confirmed Yahoo Finance WebSocket connectivity in normal PowerShell. An earlier attempt in the restricted project shell failed at DNS resolution. Live AAPL receipt remains unverified. Final Assignment 4.1 evidence requires a separate live-receipt check during active market conditions. See the [Prompt 05 verification record](docs/verification.md#prompt-05---bounded-aapl-check).
 
 ### Start the dashboard
 
@@ -102,7 +102,7 @@ Stop the live-mode backend and start the default `app.main:app` backend from the
 
 Choose `1×`, `2×`, or `4×` and start the replay. Pause freezes playback. Resume continues from the same observation, and reset clears the chart so the same selection can run again. The backend uses stored observation IDs for arrival order. A late observation or verified revision changes the chart when its turn arrives. The chart shows **Replay**, the original source and receipt times, observation ID, and whether the candle is forming or complete.
 
-Replay reads the saved rollback-journal SQLite database without writing to it. Stop any external writer before replaying. A clean checkout or an empty range displays a no-observations message. The browser SmokeTest creates a separate constructed database and removes it afterward. Actual Yahoo receipt and replay from a captured Yahoo session remain pending. See the [replay contract](docs/design-pipeline.md#prompt-09-recorded-session-replay) and [fixture evidence](docs/verification.md#prompt-09---read-only-sqlite-replay).
+Replay reads the saved rollback-journal SQLite database without writing to it. Stop any external writer before replaying. A clean checkout or an empty range displays a no-observations message. The browser SmokeTest creates a separate constructed database and removes it afterward. The offline replay of Yahoo observation 193 matched the original timestamps and close of `358.1301`, with volume `Unavailable` and zero Yahoo requests or subscriptions. The runtime database hash and all 226 rows were unchanged. See the [replay contract](docs/design-pipeline.md#prompt-09-recorded-session-replay), [constructed fixture evidence](docs/verification.md#prompt-09---read-only-sqlite-replay), and [offline Yahoo replay screenshot](docs/evidence/08a-offline-yahoo-replay.png).
 
 ### Integrated live check
 
@@ -112,7 +112,7 @@ During the separately authorized AAPL check, the opt-in startup command from `ba
 .\.venv\Scripts\python.exe -B -m uvicorn app.main:create_live_app --factory --host 127.0.0.1 --port 8000 --timeout-graceful-shutdown 5
 ```
 
-Run a single backend process for this mode. It opens one AAPL subscription and uses the ignored SQLite database for history and new observations. The chart can show the observation ID, source time, and receipt time alongside the resulting candle. The integrated check must match those values against the stored observation and the WebSocket message. Actual live receipt remains pending. See the [live check evidence requirements](docs/design-pipeline.md#integrated-live-check).
+Run a single backend process for this mode. It opens one AAPL subscription and uses the ignored SQLite database for history and new observations. On November 13, 2026, the integrated check traced observation 193 from SQLite to the live dashboard. The browser WebSocket was connected, the feed was live, and the forming one-minute candle closed at `358.1301` with volume `Unavailable`. The separately constructed feed check showed upstream unavailability and recovery while the browser socket stayed connected. See the [live screenshot](docs/evidence/08a-live-aapl-receipt.png) and [trace record](docs/verification.md#live-yahoo-aapl-capture).
 
 ### Initialize the local observation database
 
@@ -146,7 +146,8 @@ For a field explicitly identified as a cumulative session total, volume is the l
 | `frontend/` | Vue connection interface and synthetic candlestick chart, Vite proxy, pinned manifest, and Chrome SmokeTest |
 | `docs/design-pipeline.md` | Planned data flow and evidence requirements |
 | `docs/verification.md` | Commands, expected results, and observed results |
-| `prompts/` | 20 original instructor prompts and the student-added governance checkpoint `01a-project-governance-and-version-control.md` |
+| `docs/evidence/` | Public screenshots of the live AAPL capture and offline Yahoo replay |
+| `prompts/` | 20 original instructor prompts and the student-added governance and live evidence checkpoints |
 | `prompts/data/sample-candles.csv` | Instructor practice sample with three synthetic candles |
 | `handoffs/create-handoff.md` | Handoff instructions |
 | `handoffs/current.md` | Latest checkpoint and next task |

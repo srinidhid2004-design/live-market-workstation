@@ -400,7 +400,7 @@ The complete backend discovery command, `.\.venv\Scripts\python.exe -B -m unitte
 | Check | Expected | Observed |
 | --- | --- | --- |
 | `netstat.exe -ano -p tcp` before the probe | No listeners on 8000 or 5173 | Both ports were free. |
-| `.\backend\.venv\Scripts\python.exe -B -` from the project root, with the one-shot probe supplied on stdin | Call `yfinance.WebSocket(verbose=False).subscribe("AAPL")` once and listen for one qualifying AAPL update | The one connection attempt started at `2026-11-13T04:40:16.275599Z` and ended at `2026-11-13T04:40:16.280076Z`. DNS resolution for `streamer.finance.yahoo.com` failed with `gaierror` 11001. The WebSocket never opened. The subscription could not be sent. Live receipt remains unverified. |
+| `.\backend\.venv\Scripts\python.exe -B -` from the project root, with the one-shot probe supplied on stdin | Call `yfinance.WebSocket(verbose=False).subscribe("AAPL")` once and listen for one qualifying AAPL update | The one connection attempt started at `2026-11-13T04:40:16.275599Z` and ended at `2026-11-13T04:40:16.280076Z`. DNS resolution for `streamer.finance.yahoo.com` failed with `gaierror` 11001. The WebSocket never opened. The subscription could not be sent. |
 | Probe bounds and output | Five-second handshake timeout, 20-second receive deadline measured from probe start, two-second close timeout, and a 28-second worker watchdog. No retry or redirect follow-up. Emit only normalized evidence. | The attempt ended before any timeout. No price, provider timestamp, receipt timestamp, or volume was observed. There was no payload to retain or print. |
 | Probe cleanup and `netstat.exe -ano -p tcp` afterward | Probe process exits, with no probe TCP entries or project port listeners | The worker exited. No probe TCP entries or listeners on 8000 or 5173 remained. |
 
@@ -412,7 +412,7 @@ The student ran the approved one-shot probe from the project root in normal Powe
 {"outcome": "timeout", "dns_resolved": true, "websocket_opened": true, "ticker": "AAPL"}
 ```
 
-DNS resolution for `streamer.finance.yahoo.com` succeeded and the Yahoo Finance WebSocket opened. No qualifying AAPL update arrived within the bound. No price, source timestamp, backend receipt timestamp, or volume was observed. Live market-data receipt remains unverified. No retry was made. Final Assignment 4.1 evidence still requires a separately approved receipt check during active market conditions.
+DNS resolution for `streamer.finance.yahoo.com` succeeded and the Yahoo Finance WebSocket opened. No qualifying AAPL update arrived within the bound. The probe ended without a price, source timestamp, backend receipt timestamp, volume, or retry. The later integrated run verified actual AAPL receipt. See [Supplemental Prompt 08a](#supplemental-prompt-08a---bounded-live-evidence).
 
 #### Final regression and cleanup
 
@@ -558,11 +558,11 @@ The student ran `npm.cmd --prefix .\frontend run test:connection` from the proje
 
 Chrome reported no unexpected application-console errors. The failed-resource entry came from the intentional backend-outage request. Vite logged `ECONNRESET` during WebSocket teardown, and the run passed. The immediate listener check briefly showed port 5173. A later bounded check found no listeners on ports 8000 or 5173. The remaining TCP rows were closed, `TIME_WAIT`, or `FIN_WAIT`. No process required manual termination.
 
-The run made no Yahoo request. Actual live AAPL receipt remains pending for the separately authorized market-hours check.
+The SmokeTest used synthetic and constructed inputs and made no Yahoo request.
 
 ### Live check gate
 
-The opt-in path and the observation-to-chart trace are ready for a separately authorized integrated attempt during an active regular session. Prompt 05 established Yahoo DNS and WebSocket connectivity in normal PowerShell and timed out before receipt. Actual live AAPL receipt and display remain unverified. See the [integrated check evidence requirements](design-pipeline.md#integrated-live-check).
+Prompt 05 established Yahoo DNS and WebSocket connectivity in normal PowerShell and timed out before receipt. The later separately authorized market-hours run verified the opt-in observation-to-chart path with a persisted AAPL update. See [Supplemental Prompt 08a](#supplemental-prompt-08a---bounded-live-evidence).
 
 ## Prompt 09 - Read-only SQLite replay
 
@@ -595,7 +595,7 @@ The in-process FastAPI tests opened the app without an upstream provider. Chrome
 | Final 14:31 close and displayed volume | `110`, `Unavailable` | `110`, `Unavailable` |
 | SQLite after replay | Six rows, schema version 1, same SHA-256 | Six rows, schema version 1, same SHA-256 |
 
-ID 4 arrived after the 14:31 candle appeared, then changed the earlier 14:30 candle. ID 5 remained independent at the same source time. ID 6 replaced ID 4, so the high fell from 109 to 105 and the low remained 98. Both candles were complete at the selection end. An empty selection displayed `No recorded observations exist for this selection.` The backend Yahoo provider call count was zero, and Chrome made no external request during the replay check. The constructed evidence covers the replay mechanism. Actual live receipt and replay from a captured Yahoo session remain pending.
+ID 4 arrived after the 14:31 candle appeared, then changed the earlier 14:30 candle. ID 5 remained independent at the same source time. ID 6 replaced ID 4, so the high fell from 109 to 105 and the low remained 98. Both candles were complete at the selection end. An empty selection displayed `No recorded observations exist for this selection.` The backend Yahoo provider call count was zero, and Chrome made no external request during the replay check. These results are for the constructed fixture. See the separate [offline replay of the Yahoo capture](#offline-replay-of-the-yahoo-capture).
 
 ### Preliminary verification
 
@@ -661,4 +661,67 @@ The replay database SHA-256 remained `824796bdb1735671dc73e27214e514829bc5500ab6
 
 Immediately after Playwright exited, Windows briefly displayed ports 8000 and 5173 as listening. Port 8000 disappeared first. Port 5173 briefly appeared with owner PID 0, which was left alone. After a bounded delay, `Get-NetTCPConnection` returned no listeners on either project port, `netstat` showed no 5173 listener, and `Test-NetConnection 127.0.0.1 -Port 5173` returned `False` for `TcpTestSucceeded`. Cleanup is verified.
 
-Replay of a captured Yahoo session remains pending because no qualifying live Yahoo observation has been received.
+## Supplemental Prompt 08a - Bounded live evidence
+
+### Restricted-shell preflight
+
+Preflight on November 13, 2026 confirmed a clean `feature/assignment-4-part-1` at `0dd1591d381b7de0895167617ad436e980fd28a3` (`Add verified read-only market replay`), `main` at `474573e81efca7b4921cd602f4dee7803f804f36`, an empty index, no remote, and no listeners on ports 8000 or 5173. All 40 Python and 133 applicable frontend package versions matched their locks. The other 50 npm lock entries were optional dependencies for other platforms. The runtime database and SQLite sidecars were ignored, untracked, and absent.
+
+At `2026-11-13T15:45:30Z` (10:45:30 a.m. ET), the installed AAPL calendar alias `XNAS` resolved to `XNYS` and showed an active regular session from 14:30 to 21:00 UTC (9:30 a.m. to 4:00 p.m. ET). The next regular session starts November 16 at 9:30 a.m. ET.
+
+| Live trace check | Observed |
+| --- | --- |
+| Local transport preflight | Node bound a disposable loopback socket. The local connection returned `EACCES`. The socket was closed. The restricted shell could not verify the Uvicorn, Vite, and Chrome path. |
+| Yahoo connections, requests, and subscriptions | Zero in this shell. The live factory and the 90-second observation timer did not start. |
+| Runtime SQLite before and after | File absent both times, with zero stored rows and no database bytes to hash. |
+
+All 79 backend tests passed in 36.698 seconds using the process-local asyncio polling runner. The asyncio slow-task diagnostics were non-failing. `pip check` passed. ESLint passed with zero warnings, and Vite's production build transformed 23 modules. Playwright listed all five tests. Three existing routed Chrome regressions and the delayed replay coverage and retired-WebSocket check passed. The full loopback suite was not rerun in this shell. The earlier five-test normal-PowerShell run remains the full suite evidence.
+
+`git diff --check`, credential and private-path scans, and runtime and generated-file checks passed during preflight. The original prompt files matched `main` by SHA-256. The TCP inventory showed no listeners on ports 8000 or 5173. Source, tests, dependencies, and lockfiles were unchanged.
+
+### Live Yahoo AAPL capture
+
+The student used one normal-PowerShell backend process with `app.main:create_live_app` during the November 13, 2026 regular session. It started exactly one Yahoo Finance subscription session for AAPL. There was no retry, alternate symbol, alternate provider, or second live session. SQLite recorded 226 unique observations. `PRAGMA user_version` returned `1`, `PRAGMA integrity_check` returned `ok`, and the maximum observation ID was `226`.
+
+| Observation 193 | Persisted value |
+| --- | --- |
+| Source and symbol | `yahoo_finance`, `AAPL` |
+| Source time (UTC) | `2026-11-13T16:37:16.000000Z` |
+| Backend receipt time (UTC) | `2026-11-13T16:37:20.474437Z` |
+| Price | `358.1301` |
+| Volume evidence | Cumulative `day_volume` of `13370409` |
+| Revision | None |
+
+The dashboard showed `AAPL`, `Yahoo Finance`, data mode `Live`, feed status `Live`, and browser WebSocket `Connected`. The chart update displayed observation ID `193`, the matching source and receipt times, and a source age of four seconds. The 16:37 UTC one-minute candle showed OHLC `358.11 / 358.18 / 358.11 / 358.1301`, status `Forming`, coverage `Full (1/1 minutes)`, and volume `Unavailable`. The recorder retained the cumulative field. The app leaves Yahoo's mapping to per-candle volume unset. See the [live dashboard screenshot](evidence/08a-live-aapl-receipt.png).
+
+### Offline replay of the Yahoo capture
+
+The live backend was stopped before the default backend started with `app.main:app`. Replay coverage listed `AAPL` from `yahoo_finance`. The selection used interval `1m` at `4×` and selected the original receipt time within the half-open UTC range below.
+
+| Replay check | Observed |
+| --- | --- |
+| Inclusive receipt start | `2026-11-13T16:37:20.474437Z` |
+| Exclusive receipt end | `2026-11-13T16:37:20.474438Z` |
+| Playback and feed | `Replay completed.`, data mode `Replay`, feed `Recorded session — live feed off`, and browser WebSocket `Connected` only to local `/api/replay/stream` |
+| Observation | ID `193`, source time `2026-11-13T16:37:16.000000Z`, receipt time `2026-11-13T16:37:20.474437Z` |
+| One-minute candle | Close `358.1301`, volume `Unavailable`, status `Forming`, coverage `Full (1/1 minutes)` |
+| Yahoo requests and subscriptions | Zero requests and zero subscriptions |
+| Database SHA-256 before replay | `bd7dd27b4043798b2d29f48078ee913bb9c4383b81ba10ceabb6571fea6088c8` |
+| Database SHA-256 after replay | `bd7dd27b4043798b2d29f48078ee913bb9c4383b81ba10ceabb6571fea6088c8` |
+| Database comparison | `true`. All 226 observations remained unchanged. |
+
+The replay matched the live screenshot and the SQLite row for ID and timestamps, with the same close and unavailable volume as the live candle. Playback completed while the candle was still forming at the selected receipt-time cutoff. The [replay screenshot](evidence/08a-offline-yahoo-replay.png) is a direct render of page 5 from the local evidence PDF. The PDF was kept outside the repository.
+
+### Constructed feed outage and synthetic practice
+
+The separate Chrome check used constructed recorded observations. During the deterministic outage, the browser WebSocket remained `Connected` and the upstream feed became `Unavailable`, with close 103 still displayed. Recovery restored `Recorded input`. The instructor's three synthetic CSV rows are the default practice history and were separate from both the live Yahoo capture and its offline replay.
+
+### Cleanup and evidence review
+
+The normal-PowerShell check briefly showed port 5173 listening immediately after replay. After a bounded five-second delay, neither port 8000 nor 5173 had a listener. `Test-NetConnection 127.0.0.1 -Port 5173` returned `False` for `TcpTestSucceeded`. No process was terminated manually. The runtime database remains ignored and untracked.
+
+The local evidence review opened the runtime file with `mode=ro&immutable=1` and `query_only`. The exact replay range selected only ID 193, and source-time ordering through that ID matched the live OHLC. The row count, distinct fingerprint count, and maximum ID were each 226. The schema version and integrity check matched the capture record. The SHA-256 matched the reported replay hash and was unchanged by the review. A fresh TCP inventory found neither project port listening.
+
+Both evidence PNGs were visually inspected. The replay page was rendered at 240 DPI without changing the interface content. The PNGs contained no embedded text or EXIF metadata, and visual and OCR checks found no private paths. Relative links and section anchors, `git diff --check`, and credential and private-path scans passed. The 20 instructor prompts and the instructor CSV matched the foundation commit by hash. Runtime SQLite files, sidecars, generated output, and dependency directories were absent from the Git index. Nothing was staged.
+
+The finalization used the supplied normal-PowerShell evidence and the two images. It made zero Yahoo requests or subscriptions and did not rerun the browser suite. The final report, public repository publication, video, and Canvas submission remain pending.
