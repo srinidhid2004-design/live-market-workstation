@@ -120,6 +120,18 @@ def _canonical_json(value: dict[str, object]) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+def observation_source_time(observation: Observation) -> datetime:
+    unit = observation.source_timestamp_unit
+    if type(observation.source_timestamp) is not int or unit not in MICROSECONDS_PER_UNIT:
+        raise ValueError("Source time must be an integer Unix timestamp with a supported unit.")
+    try:
+        return UNIX_EPOCH + timedelta(
+            microseconds=observation.source_timestamp * MICROSECONDS_PER_UNIT[unit]
+        )
+    except OverflowError as exc:
+        raise ValueError("Source time is outside the supported UTC range.") from exc
+
+
 def _storage_values(observation: Observation) -> dict[str, str | int | float | None]:
     if not isinstance(observation.source_name, str) or not observation.source_name.strip():
         raise ValueError("Source name is required.")
@@ -128,15 +140,7 @@ def _storage_values(observation: Observation) -> dict[str, str | int | float | N
     event_id = observation.verified_event_id
     if event_id is not None and (not isinstance(event_id, str) or not event_id.strip()):
         raise ValueError("Verified event ID must be a nonempty string.")
-    unit = observation.source_timestamp_unit
-    if type(observation.source_timestamp) is not int or unit not in MICROSECONDS_PER_UNIT:
-        raise ValueError("Source time must be an integer Unix timestamp with a supported unit.")
-    try:
-        source_time = UNIX_EPOCH + timedelta(
-            microseconds=observation.source_timestamp * MICROSECONDS_PER_UNIT[unit]
-        )
-    except OverflowError as exc:
-        raise ValueError("Source time is outside the supported UTC range.") from exc
+    source_time = observation_source_time(observation)
     if not isinstance(observation.received_at, datetime) or observation.received_at.utcoffset() is None:
         raise ValueError("Receipt time must be timezone-aware.")
     if type(observation.price) not in (int, float):
@@ -154,7 +158,7 @@ def _storage_values(observation: Observation) -> dict[str, str | int | float | N
         "source_name": observation.source_name.strip(),
         "ticker": observation.ticker.strip().upper(),
         "source_timestamp": observation.source_timestamp,
-        "source_timestamp_unit": unit,
+        "source_timestamp_unit": observation.source_timestamp_unit,
         "price": price,
         "verified_event_id": event_id,
     }

@@ -2,6 +2,12 @@
 
 ## Checkpoint
 
+Prompt 08 connects the existing AAPL chart to `/api/market-feed` for all five timeframes. Default startup uses the synthetic CSV. The recorded SmokeTest injects constructed observations and uses a disposable database. The opt-in Yahoo provider uses one lifecycle-owned AAPL subscription per backend process. The coordinator commits observations before publishing backend-calculated candles. The chart displays downstream connection and upstream feed status separately, and exposes timestamps, observation ID, coverage, and completion. See the [protocol](../docs/design-pipeline.md#prompt-08-market-feed-websocket) and [Prompt 08 verification](../docs/verification.md#prompt-08---market-feed-websocket).
+
+All 67 backend tests and three routed Chrome checks passed. The post-fix normal-PowerShell SmokeTest then passed all three Playwright tests in 24.0 seconds. It verified health and backend outage recovery, `Unavailable` for unknown volume, `0 shares` at 14:31 UTC, and the recorded update from close 100 to 103 for SQLite observation ID 2. The browser stayed connected through the upstream outage, recovery added the next candle, and the timeframe test rejected delayed HTTP responses and retired WebSocket updates.
+
+The initial normal-PowerShell run passed two of three tests. AutoLoop reproduced a layout-only crosshair callback moving the inspector from the 14:31 candle to the 14:32 candle. The inspector now accepts mouse or touch selection, and the test uses timestamp-derived option values with its HTTP fixture isolated from WebSocket snapshots. The final run had no unexpected Chrome application-console errors. The intentional outage logged one failed request, and Vite's teardown `ECONNRESET` was non-failing. Port 5173 briefly appeared in the immediate listener check. A later bounded check found no listeners on either service port, and no process required manual termination. See the [AutoLoop evidence](../docs/verification.md#browser-smoketest-autoloop) and [final SmokeTest](../docs/verification.md#final-normal-powershell-smoketest).
+
 Prompt 07A adds `1m`, `5m`, `15m`, `1h`, and `1d` AAPL history with a metadata envelope. The default chart still uses the three synthetic minutes. The five-minute fixture gives `100/105/99/104/3550` with 3/5 coverage, and daily coverage is 3/390. Saved-observation snapshots can apply an `as_of` cutoff before revision selection. The approved 40-pin lock is installed, and `XNAS` resolves to the shared `XNYS` regular-session calendar. See the [Prompt 07A verification](../docs/verification.md#prompt-07a---regular-session-timeframes).
 
 Prompt 07 adds provider-independent one-minute UTC candle calculation over the SQLite recorder's current versions. The constructed AAPL fixture returned O/H/L/C/V `100/103/100/101/11` before and at completion, and again after the late observation. All 41 backend tests passed with the process-local asyncio runner. `pip check`, frontend ESLint, and the production build passed. See the [Prompt 07 results](../docs/verification.md#prompt-07---one-minute-candles).
@@ -12,7 +18,7 @@ Prompt 05's normal-PowerShell installation is complete. All 36 pins match `backe
 
 Final verification passed all 12 backend tests with the process-local asyncio runner, frontend ESLint with zero warnings, and the production build. Ports 8000 and 5173 were free and the Yahoo probe had exited. The virtual environment and generated artifacts remain ignored and untracked.
 
-Prompt 07 started at `54da86d` on `feature/assignment-4-part-1`, with `main` at `474573e`, a clean worktree, an empty index, and no remote. Prompts 2 and 3 were verified and committed at `0954655` and `c683818`. Prompt 4's committed chart uses the synthetic CSV. Its isolated Chrome favicon check, lint, and build passed. The complete post-fix running-app SmokeTest still needs normal PowerShell with loopback access. See the [Prompt 4 verification](../docs/verification.md#prompt-4-autoloop---favicon-console-error).
+Prompt 07 started at `54da86d` on `feature/assignment-4-part-1`, with `main` at `474573e`, a clean worktree, an empty index, and no remote. Prompts 2 and 3 were verified and committed at `0954655` and `c683818`. Prompt 4's committed chart uses the synthetic CSV. Its isolated Chrome favicon check, lint, and build passed. See the [Prompt 4 verification](../docs/verification.md#prompt-4-autoloop---favicon-console-error).
 
 ## Foundation files and checks
 
@@ -26,9 +32,8 @@ Prompt 07 started at `54da86d` on `feature/assignment-4-part-1`, with `main` at 
 
 ## Outstanding decisions and next task
 
-- Obtain separate approval for an AAPL receipt check during active market conditions to collect final Assignment 4.1 evidence. The decoder, recorder, and candle calculations are available for the future live pipeline. Saved-history delivery, application WebSockets, frontend live updates, and replay remain pending.
-- Run the connection SmokeTest in normal PowerShell with loopback access. The Prompt 07A run in the project shell reached the Vite readiness deadline before assertions. In-process backend tests and the offline Chrome chart check passed.
-- Later design decisions include the stale-data threshold, live provider volume mapping, and replay order and pacing. Keep the course disclosure current as tools or models change.
+- Actual live AAPL receipt remains pending for the separately authorized market-hours check. The final SmokeTest made no Yahoo request. Trace a qualifying Yahoo message through normalization, the persisted observation ID, the backend candle, the FastAPI WebSocket, and the visible chart. The Prompt 05 probe established connectivity and reached its bound before receiving a qualifying update.
+- Replay controls, replay order and pacing, and verified Yahoo volume semantics remain future work. Keep the course disclosure current as tools or models change.
 
 ## Prompt 2A connectivity retry
 

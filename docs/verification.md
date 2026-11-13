@@ -508,3 +508,58 @@ Resumed on `feature/assignment-4-part-1` at `b9ed96c` with the two approved depe
 | Offline Chrome chart check | Intercepted requests served the built bundle and the fixture envelope. Chrome showed the three chart choices, the original 14:31 values, and the difference between unavailable and zero volume. No page errors were observed. |
 | `npm.cmd --prefix frontend run test:connection -- --global-timeout=15000` | Timed out during Vite setup before assertions. Repeat `npm.cmd --prefix frontend run test:connection` in normal PowerShell with loopback access. |
 | `git diff --check` and safety scans | Passed. The changed content had no credential-pattern or private-path matches. Generated files remained ignored and untracked. No runtime database or sidecars remained, and ports 8000 and 5173 had no listeners. No Yahoo request was made. |
+
+## Prompt 08 - Market feed WebSocket
+
+The original precheck confirmed a clean `feature/assignment-4-part-1` at `3bbe00f`, `main` at `474573e81efca7b4921cd602f4dee7803f804f36`, an empty index, and no remote. Verification resumed with the Prompt 08 edits in the working tree. No dependency files changed and no Yahoo request was made. The mock feed used constructed AAPL observations and disposable SQLite databases.
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| Installed metadata compared with `backend/requirements.lock.txt` and `.\backend\.venv\Scripts\python.exe -B -m pip check` | All 40 pins match, with no broken requirements | 40 of 40 matched. `No broken requirements found.` |
+| `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v` from `backend/` | All backend regressions pass | 67 tests passed in 7.629 seconds with the process-local Windows asyncio polling runner described in Prompt 05. An initial runner variant hit Windows error 10022 when selecting on an empty descriptor set. Polling briefly when the set is empty resolved it. The runner made no project source edits. |
+| In-process FastAPI WebSocket tests | History/snapshot parity, timestamp upserts, persistence before publication, deduplication, unknown volume, independent socket and feed states, one provider for two clients, bounded errors, and shutdown cleanup | Passed. Tests covered late observations, verified corrections, revisions moving between intervals, injected-clock staleness and completion, outage and recovery, and a timed-out snapshot read joined during shutdown. Out-of-calendar source observations remained auditable and valid candles stayed available. |
+| Yahoo adapter tests using a fake transport | One AAPL subscription, selected fields, no retry, and close on cancellation | Passed. The tests made no network connection. |
+| `npm.cmd --prefix frontend run lint` and `npm.cmd --prefix frontend run build` | Zero ESLint warnings and a production build | Passed. Vite 7.3.8 transformed 20 modules. |
+| `npm.cmd --prefix frontend run test:connection -- --list` | Discover all three browser tests | All three were listed. |
+| `node node_modules/playwright/cli.js test --global-timeout=15000` from `frontend/` | Run the full browser SmokeTest with Vite and Uvicorn | Exited during Vite setup before browser assertions. A local Node TCP check bound to loopback, but the connection attempt returned `EACCES`. See the completed normal-PowerShell run below. |
+| `git diff --check` and checks on new files | No whitespace errors, credential-pattern matches, or private absolute paths | Passed across all 16 changed files. |
+| `git check-ignore`, `git ls-files`, and process and TCP scans | Generated paths remain ignored and untracked. Test databases, sidecars, and services are gone. | Passed. `backend/data` contains only the sample CSV. Ports 8000 and 5173 have no TCP entries, and no Python, Node, Chrome, or esbuild process remains from the checks. One empty test directory from the interrupted run remains in `backend/`. |
+
+### Constructed observation trace in Chrome
+
+The recorded demo ran in-process through FastAPI HTTP and WebSocket handlers. The Chrome check routed the built Vue app to the captured HTTP responses and WebSocket messages. The injected source advanced from a 100 close to a 103 close within the same candle. The updated message carried observation ID 2, with source and receipt time `2026-11-09T14:30:30Z`. A SQLite read confirmed ID 2 and price 103. Chrome displayed the new close with a single candle and unavailable volume. During the injected outage, the last close stayed visible, the WebSocket remained **Connected**, and upstream became **Unavailable**. Recovery added a close of 104 in the next minute and displayed the first candle as **Complete** and the new one as **Forming**.
+
+The routed Chrome checks also verified the synthetic chart, mocked backend outage and recovery, timeframe selection, rejection of delayed history and retired socket data, and bounded reconnect. The first recorded-browser run exposed an overly scoped Playwright locator, which was corrected. The offline Playwright CLI reached its runner teardown deadline after all assertions passed. A direct rerun using Playwright's Chrome API (`node .cache/prompt08-offline-runner.mjs` from `frontend/`, with an isolated test harness and captured fixture) exited 0 with all three checks passing and no unexpected page or console errors.
+
+### Browser SmokeTest AutoLoop
+
+The student reported that the full normal-PowerShell SmokeTest passed two of three tests. The synthetic chart test displayed `Unavailable` for the modified 14:30 UTC candle. The next assertion expected `0 shares` at 14:31 UTC and received `1,500 shares`, the volume of the unmodified 14:32 UTC candle. The Playwright failure artifact confirmed the mismatch.
+
+An offline Chrome reproduction held the first chart layout frames and used the modified HTTP response with a local WebSocket route that sent no messages. Playwright's original index selection returned option `1794234660` (14:31 UTC) and the inspector showed `0 shares`. Releasing the frames emitted Lightweight Charts crosshair callbacks without a mouse or touch event. One moved the inspector to option `1794234720` (14:32 UTC), which displayed `1,500 shares`. A viewport resize reproduced the same selection change separately. The HTTP rows and socket responses stayed fixed during both reproductions.
+
+AutoLoop cycle 1 changed the chart inspector to accept crosshair selection only from callbacks with a mouse or touch `sourceEvent`. The SmokeTest now modifies the HTTP rows by timestamp, selects both options by Unix-second value, and checks the selected value and displayed volume. The isolated reload intercepts the WebSocket locally without forwarding it or sending a snapshot. The original unmodified history, chart rendering, and real WebSocket assertions still run before that reload.
+
+| Check | Observed |
+| --- | --- |
+| Focused offline Chrome check with an in-memory Vite build and the captured FastAPI fixture | Passed. Chrome showed `Unavailable` at 14:30 and `0 shares` at 14:31. The 14:31 selection and OHLCV stayed stable after releasing the initial layout frames and resizing from 1280 to 710 pixels. A real pointer move still changed the selected candle. One mocked socket was opened and no unexpected page or console errors occurred. |
+| `npm.cmd --prefix .\frontend run lint` and `npm.cmd --prefix .\frontend run build` | Passed. ESLint reported zero warnings. Vite transformed 20 modules. |
+| `npm.cmd --prefix .\frontend run test:connection -- --global-timeout=18000 --output=.cache/prompt08-autoloop-results` | The restricted shell timed out during Vite setup before assertions. An independent Node loopback connection probe returned `EACCES`. |
+| `git diff --check` and `netstat.exe -ano -p tcp` | Passed. Ports 8000 and 5173 had no listeners after the attempt. No test process remained. |
+
+### Final normal-PowerShell SmokeTest
+
+The student ran `npm.cmd --prefix .\frontend run test:connection` from the project root in normal PowerShell after the AutoLoop fix. All three Playwright tests passed in 24.0 seconds.
+
+| Test | Observed |
+| --- | --- |
+| Local connection, health, backend outage, and recovery | Passed. The chart displayed `Unavailable` for unknown volume and `0 shares` for the 14:31 UTC candle with known zero. |
+| Recorded input and upstream recovery | Passed. The chart close moved from 100 to 103 and persisted observation ID 2 was verified. The browser WebSocket stayed connected while upstream became unavailable. Recovery added the next candle. |
+| Timeframe switching | Passed. The chart rejected delayed HTTP responses and updates from retired WebSockets. |
+
+Chrome reported no unexpected application-console errors. The failed-resource entry came from the intentional backend-outage request. Vite logged `ECONNRESET` during WebSocket teardown, and the run passed. The immediate listener check briefly showed port 5173. A later bounded check found no listeners on ports 8000 or 5173. The remaining TCP rows were closed, `TIME_WAIT`, or `FIN_WAIT`. No process required manual termination.
+
+The run made no Yahoo request. Actual live AAPL receipt remains pending for the separately authorized market-hours check.
+
+### Live check gate
+
+The opt-in path and the observation-to-chart trace are ready for a separately authorized integrated attempt during an active regular session. Prompt 05 established Yahoo DNS and WebSocket connectivity in normal PowerShell and timed out before receipt. Actual live AAPL receipt and display remain unverified. See the [integrated check evidence requirements](design-pipeline.md#integrated-live-check).

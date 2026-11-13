@@ -1,12 +1,14 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { CandlestickSeries, createChart, HistogramSeries } from 'lightweight-charts'
+import { intervals, symbol, useMarketFeed } from '../marketFeed.js'
 
 const chartHost = ref(null)
 const candles = ref([])
 const selected = ref(null)
-const state = ref('Loading synthetic candles.')
-const request = new AbortController()
+const {
+  interval, historyState, transport, feed, source, snapshot, upsert, retry,
+} = useMarketFeed()
 const upColor = '#087f72'
 const downColor = '#b84045'
 const volumeFormat = new Intl.NumberFormat('en-US')
@@ -21,13 +23,44 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', {
 })
 let chart
 let priceSeries
-let rowsByTime
+let volumeSeries
+let rowsByTime = new Map()
+
+const sourceNames = {
+  synthetic_csv: 'Synthetic CSV',
+  yahoo_finance: 'Yahoo Finance',
+  constructed_test: 'Constructed test data',
+}
+const dataModes = { synthetic: 'Synthetic', recorded: 'Recorded', live: 'Live' }
+const transportLabels = { connecting: 'Connecting', connected: 'Connected', disconnected: 'Disconnected' }
+const feedLabels = {
+  connecting: 'Connecting',
+  live: 'Live',
+  stale: 'Stale',
+  unavailable: 'Unavailable',
+  recorded: 'Recorded input',
+}
+const heading = computed(() => {
+  if (source.value?.mode === 'synthetic') {
+    return interval.value === '1m' ? 'Synthetic one-minute sample' : 'Synthetic sample'
+  }
+  return 'Market candles'
+})
+const feedStatus = computed(() => (
+  transport.value === 'connected' ? feedLabels[feed.value?.feed_status] : 'Unknown'
+))
+const sourceAge = computed(() => (
+  Number.isFinite(feed.value?.age_seconds) ? `${Math.round(feed.value.age_seconds)} s` : 'Unavailable'
+))
+const volumeUnit = computed(() => source.value?.name === 'synthetic_csv' ? ' shares' : '')
 
 function utcLabel(seconds) {
   return `${dateFormat.format(seconds * 1000)} UTC`
 }
 
-function inspectFromChart({ time }) {
+function inspectFromChart({ time, sourceEvent }) {
+  // Layout can reproject the crosshair without a mouse or touch interaction.
+  if (!sourceEvent) return
   const candle = rowsByTime.get(time)
   if (candle) selected.value = candle
 }
@@ -39,86 +72,117 @@ function inspectFromSelect(event) {
   chart.setCrosshairPosition(candle.close, candle.time, priceSeries)
 }
 
-onMounted(async () => {
-  try {
-    const response = await fetch('/api/history', {
-      cache: 'no-store',
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)]),
-    })
-    if (!response.ok) throw new Error('History request failed.')
+function ensureChart() {
+  if (chart) return
+  chart = createChart(chartHost.value, {
+    autoSize: true,
+    layout: {
+      attributionLogo: false,
+      textColor: '#365354',
+      panes: { separatorColor: '#d6e5e1', enableResize: false },
+    },
+    grid: {
+      vertLines: { color: '#eaf1ef' },
+      horzLines: { color: '#eaf1ef' },
+    },
+    localization: { timeFormatter: utcLabel },
+    timeScale: { timeVisible: true, secondsVisible: false, maxBarSpacing: 96 },
+  })
+  priceSeries = chart.addSeries(CandlestickSeries, {
+    upColor,
+    downColor,
+    wickUpColor: upColor,
+    wickDownColor: downColor,
+    borderVisible: false,
+    priceLineVisible: false,
+  })
+  volumeSeries = chart.addSeries(HistogramSeries, {
+    color: '#638ca5',
+    priceFormat: { type: 'volume' },
+    priceLineVisible: false,
+  }, 1)
+  chart.panes()[0].setStretchFactor(3)
+  chart.panes()[1].setStretchFactor(1)
+  chart.subscribeCrosshairMove(inspectFromChart)
+}
 
-    const { candles: rows } = await response.json()
-    if (request.signal.aborted) return
-    if (rows.length === 0) {
-      state.value = 'No synthetic candles available.'
-      return
-    }
+function chartRow({ timestamp, ...values }, metadata) {
+  return { ...values, time: Date.parse(timestamp) / 1000, metadata }
+}
 
-    const data = rows.map(({ timestamp, ...values }) => ({
-      ...values,
-      time: Date.parse(timestamp) / 1000,
-    }))
-    rowsByTime = new Map(data.map((candle) => [candle.time, candle]))
-    chart = createChart(chartHost.value, {
-      autoSize: true,
-      layout: {
-        attributionLogo: false,
-        textColor: '#365354',
-        panes: { separatorColor: '#d6e5e1', enableResize: false },
-      },
-      grid: {
-        vertLines: { color: '#eaf1ef' },
-        horzLines: { color: '#eaf1ef' },
-      },
-      localization: { timeFormatter: utcLabel },
-      timeScale: { timeVisible: true, secondsVisible: false, maxBarSpacing: 96 },
-    })
-    priceSeries = chart.addSeries(CandlestickSeries, {
-      upColor,
-      downColor,
-      wickUpColor: upColor,
-      wickDownColor: downColor,
-      borderVisible: false,
-      priceLineVisible: false,
-    })
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: '#638ca5',
-      priceFormat: { type: 'volume' },
-      priceLineVisible: false,
-    }, 1)
-    chart.panes()[0].setStretchFactor(3)
-    chart.panes()[1].setStretchFactor(1)
-    priceSeries.setData(data.map(({ time, open, high, low, close }) => ({
-      time, open, high, low, close,
-    })))
-    volumeSeries.setData(data.map(({ time, volume }) => (
-      volume === null ? { time } : { time, value: volume }
-    )))
-    chart.timeScale().fitContent()
-    chart.subscribeCrosshairMove(inspectFromChart)
-    candles.value = data
-    selected.value = data[0]
-    state.value = ''
-  } catch {
-    if (!request.signal.aborted) {
-      chart?.remove()
-      chart = undefined
-      state.value = 'Synthetic candle history is unavailable.'
-    }
+function pricePoint({ time, open, high, low, close }) {
+  return { time, open, high, low, close }
+}
+
+function volumePoint({ time, volume }) {
+  return volume === null ? { time } : { time, value: volume }
+}
+
+function setSeries(data) {
+  priceSeries.setData(data.map(pricePoint))
+  volumeSeries.setData(data.map(volumePoint))
+}
+
+watch(snapshot, (history) => {
+  const metadata = new Map(history?.metadata?.map((item) => [item.timestamp, item]))
+  const data = history?.candles.map((row) => chartRow(row, metadata.get(row.timestamp))) ?? []
+  const hadData = candles.value.length > 0
+  rowsByTime = new Map(data.map((row) => [row.time, row]))
+  candles.value = data
+  selected.value = rowsByTime.get(selected.value?.time) ?? data[0] ?? null
+  if (data.length) ensureChart()
+  if (chart) {
+    setSeries(data)
+    if (!hadData && data.length) chart.timeScale().fitContent()
   }
-})
+}, { flush: 'sync' })
 
-onBeforeUnmount(() => {
-  request.abort()
-  chart?.remove()
-})
+watch(upsert, (event) => {
+  if (!event) return
+  ensureChart()
+  const row = chartRow(event.candle, event.metadata)
+  const last = candles.value.at(-1)
+  rowsByTime.set(row.time, row)
+  candles.value = [...rowsByTime.values()].sort((left, right) => left.time - right.time)
+  if (selected.value?.time === row.time || !selected.value) selected.value = row
+  if (!last || row.time >= last.time) {
+    priceSeries.update(pricePoint(row))
+    volumeSeries.update(volumePoint(row))
+  } else {
+    // A late or revised observation may change a bucket before the latest one.
+    setSeries(candles.value)
+  }
+  if (!last) chart.timeScale().fitContent()
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => chart?.remove())
 </script>
 
 <template>
   <section aria-labelledby="history-heading" class="history">
-    <h2 id="history-heading">Synthetic one-minute sample</h2>
-    <p class="axis-label">Price and volume (shares) · UTC</p>
-    <p aria-live="polite" v-if="state">{{ state }}</p>
+    <h2 id="history-heading">{{ heading }}</h2>
+    <div class="timeframe">
+      <label for="market-timeframe">Timeframe</label>
+      <select id="market-timeframe" v-model="interval">
+        <option v-for="value in intervals" :key="value" :value="value">{{ value }}</option>
+      </select>
+    </div>
+    <dl aria-label="Market feed" class="feed-details" aria-live="polite">
+      <div><dt>Symbol</dt><dd>{{ symbol }}</dd></div>
+      <div><dt>Interval</dt><dd>{{ interval }}</dd></div>
+      <div><dt>Source</dt><dd>{{ sourceNames[source?.name] ?? source?.name ?? 'Unavailable' }}</dd></div>
+      <div><dt>Data mode</dt><dd>{{ dataModes[source?.mode] ?? 'Unavailable' }}</dd></div>
+      <div><dt>Feed status</dt><dd>{{ feedStatus }}</dd></div>
+      <div><dt>WebSocket</dt><dd>{{ transportLabels[transport] }}</dd></div>
+      <div><dt>Source age</dt><dd>{{ sourceAge }}</dd></div>
+      <div><dt>Latest source time (UTC)</dt><dd>{{ feed?.latest_source_time ?? 'Unavailable' }}</dd></div>
+      <div><dt>Update source time (UTC)</dt><dd>{{ feed?.source_time ?? 'Unavailable' }}</dd></div>
+      <div><dt>Backend receipt time (UTC)</dt><dd>{{ feed?.receipt_time ?? 'Unavailable' }}</dd></div>
+      <div><dt>Observation ID</dt><dd>{{ feed?.observation_id ?? 'Unavailable' }}</dd></div>
+    </dl>
+    <button v-if="transport === 'disconnected'" type="button" @click="retry">Reconnect feed</button>
+    <p class="axis-label">Price and volume{{ volumeUnit ? ' (shares)' : '' }} · UTC</p>
+    <p v-if="historyState" aria-live="polite">{{ historyState }}</p>
     <div ref="chartHost" class="chart" role="img" aria-label="Candlestick price and volume chart" />
 
     <template v-if="selected">
@@ -135,7 +199,18 @@ onBeforeUnmount(() => {
         <div><dt>Close</dt><dd>{{ selected.close }}</dd></div>
         <div>
           <dt>Volume</dt>
-          <dd>{{ selected.volume === null ? 'Unavailable' : `${volumeFormat.format(selected.volume)} shares` }}</dd>
+          <dd>{{ selected.volume === null ? 'Unavailable' : `${volumeFormat.format(selected.volume)}${volumeUnit}` }}</dd>
+        </div>
+      </dl>
+      <dl v-if="selected.metadata" aria-label="Selected candle status">
+        <div>
+          <dt>Candle status</dt>
+          <dd>{{ selected.metadata.is_complete ? 'Complete' : 'Forming' }}</dd>
+        </div>
+        <div>
+          <dt>Coverage</dt>
+          <dd>{{ selected.metadata.coverage === 'full' ? 'Full' : 'Partial' }}
+            ({{ selected.metadata.observed_minutes }}/{{ selected.metadata.expected_minutes }} minutes)</dd>
         </div>
       </dl>
     </template>
@@ -158,6 +233,14 @@ onBeforeUnmount(() => {
 
 h2 {
   margin: 0;
+}
+
+.timeframe {
+  margin-top: 1rem;
+}
+
+.feed-details {
+  font-size: 0.875rem;
 }
 
 .axis-label,

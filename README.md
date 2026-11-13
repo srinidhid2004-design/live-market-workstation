@@ -20,12 +20,12 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | --- | --- | --- |
 | Local shell | Windows and PowerShell | Windows x64, build 26300, PowerShell 7.6.9 |
 | Backend | Python with type hints | Python 3.14.7 runs directly. The Windows `python` and `py` aliases failed in the project shell. |
-| API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | FastAPI 0.162.5 and Uvicorn 0.54.0 import in the local environment. The implemented HTTP routes are `/api/health` and `/api/history`. |
+| API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | HTTP routes are `/api/health` and `/api/history`. AAPL chart updates use `/api/market-feed`. |
 | Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed the Prompt 06 recorder and restart checks with constructed observations. |
 | Market feed | Yahoo Finance via yfinance | `yfinance==1.8.0` and `websockets==17.4` import in `backend/.venv`. The normal-PowerShell AAPL probe resolved DNS and opened the WebSocket. It timed out after 25 seconds without a qualifying update. |
 | Exchange sessions | `exchange-calendars==4.13.2` | AAPL requests `XNAS`, which uses the shared `XNYS` U.S. equity schedule. The alias has no separate Nasdaq-specific exception schedule. |
 | Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The Vue, Vite, and Lightweight Charts 5.3.0 pins are in `frontend/package.json`. |
-| Package tools | pip for Python and npm for the frontend | pip 26.2.1 runs in the existing environment. The student completed the npm install from the official registry in normal PowerShell. The 36-pin Python lock was checked against the approved resolution. |
+| Package tools | pip for Python and npm for the frontend | pip 26.2.1 runs in the existing environment. The student completed the npm install from the official registry in normal PowerShell. The 40-pin Python lock was checked against the installed distributions. |
 
 The approved Python environment is `backend/.venv`, created from CPython 3.14.7. The student completed the locked wheel installation through official PyPI in normal PowerShell. All 40 application pins match the installed distributions, and `pip check` passes. HTTPX is used only by the backend `unittest` tests. See [verification](docs/verification.md) for the setup evidence.
 
@@ -51,13 +51,19 @@ For an existing environment, keep `backend/.venv` and run only the pip commands 
 
 Prompt 05 confirmed Yahoo Finance WebSocket connectivity in normal PowerShell. An earlier attempt in the restricted project shell failed at DNS resolution. Live AAPL receipt remains unverified. Final Assignment 4.1 evidence requires a separate live-receipt check during active market conditions. See the [Prompt 05 verification record](docs/verification.md#prompt-05---bounded-aapl-check).
 
+### Start the dashboard
+
+Start the backend and frontend in separate PowerShell windows with the commands in the table below. Open `http://127.0.0.1:5173/`. The default backend serves synthetic CSV history and its matching WebSocket snapshot. A clean checkout can use this mode as soon as dependencies are installed. It starts without a runtime database or Yahoo connection.
+
+The recorded demonstration runs inside the browser SmokeTest. It starts a test-only backend with a disposable SQLite database, injects constructed AAPL observations, and checks the chart through the Vite proxy. It removes the database after stopping the test backend.
+
 ### Connection verification
 
 Run the backend test and browser SmokeTest in normal PowerShell with loopback access. The restricted project shell can run imports, syntax checks, lint, and the production build. See [verification](docs/verification.md) for the failed DNS and loopback attempts and the successful normal-PowerShell results.
 
 | Task | Working directory | Command |
 | --- | --- | --- |
-| Backend focused test | `backend/` | `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v` |
+| Complete backend tests | `backend/` | `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v` |
 | Backend development server | `backend/` | `.\.venv\Scripts\python.exe -B -m uvicorn app.main:app --host 127.0.0.1 --port 8000` |
 | Frontend development server | `frontend/` | `npm.cmd run dev` |
 | Stop a manually started service | Its server terminal | Press Ctrl+C |
@@ -66,11 +72,9 @@ Run the backend test and browser SmokeTest in normal PowerShell with loopback ac
 | Browser SmokeTest | `frontend/` | `npm.cmd run test:connection` |
 | Production-only audit | `frontend/` | `npm.cmd audit --omit=dev --cache .\.cache\npm` |
 
-For the browser SmokeTest, leave ports 8000 and 5173 free. Playwright uses the installed Chrome channel and manages both services. The verified direct backend URL is `http://127.0.0.1:8000/api/health`, and the verified frontend proxy URL is `http://127.0.0.1:5173/api/health`. Both returned HTTP 200 with the exact body `{"status":"healthy"}` before and after the restart. With the backend stopped, the proxy returned HTTP 500 and Chrome displayed `Backend unavailable.`.
+For the browser SmokeTest, leave ports 8000 and 5173 free. Playwright uses the installed Chrome channel and manages both services. The test checks `http://127.0.0.1:8000/api/health` directly and `http://127.0.0.1:5173/api/health` through Vite. It expects HTTP 200 and `{"status":"healthy"}` before and after restarting the backend, with a visible outage state while the backend is stopped.
 
-After shutdown, check for listeners with `Get-NetTCPConnection -LocalPort 8000,5173 -State Listen -ErrorAction SilentlyContinue`. The completed SmokeTest released both ports.
-
-This checkpoint verifies local HTTP connectivity. Yahoo Finance availability, live data, SQLite persistence, candlestick correctness, and WebSocket market streaming are outside its evidence.
+After shutdown, check for listeners with `Get-NetTCPConnection -LocalPort 8000,5173 -State Listen -ErrorAction SilentlyContinue`.
 
 The student's official-registry production-only audit reported zero vulnerabilities. The pinned ESLint release has an npm support-window warning, and lint passed with zero warnings. The esbuild CLI reported 0.28.2 and Vite built successfully with the esbuild post-install script still unapproved.
 
@@ -84,11 +88,23 @@ The response contains `symbol`, `interval`, `as_of`, `candles`, and `metadata`. 
 
 For example, `/api/history?symbol=AAPL&interval=5m&as_of=2026-11-09T14:35:00Z` returns a 14:30 UTC candle with O/H/L/C/V `100/105/99/104/3550` and partial coverage of three of five minutes. The data remains synthetic. See the [Prompt 07A checks](docs/verification.md#prompt-07a---regular-session-timeframes) and the [PowerShell history check](docs/verification.md#bounded-normal-powershell-check).
 
-### Inspect the synthetic chart
+### Inspect the chart
 
-Start the backend and frontend with the commands above and open `http://127.0.0.1:5173/`. The chart loads `/api/history` and draws a candle and aligned volume bar for each UTC minute. Hover over a candle or use **Inspect candle (UTC)** to see its date, time, OHLC prices, and volume. The expected close at 14:31 UTC on November 9, 2026 is **101**, with volume of **850 shares**.
+The chart defaults to `1m`. Choose `5m`, `15m`, `1h`, or `1d` to load matching HTTP history and open a new WebSocket for that interval. Hover over a candle or use **Inspect candle (UTC)** to see its time, OHLC, volume, coverage, and forming or complete status. In the synthetic `1m` fixture, the close at 14:31 UTC on November 9, 2026 is **101**, with volume of **850 shares**. Unknown volume is displayed as **Unavailable**.
 
-From the project root in normal PowerShell, run `npm.cmd --prefix .\frontend run test:connection` with ports 8000 and 5173 free. The test starts both services and checks the chart and connection behavior in installed Chrome. The chart passed an offline Chrome check with the synthetic fixture. The running-app SmokeTest still needs a shell with loopback access. Live ingestion, market-data WebSockets, and replay remain future work.
+The chart displays source and data mode, source and receipt times, server-calculated age, browser WebSocket state, and upstream feed status. A connected browser can show an unavailable upstream. After a disconnect the browser tries twice, after 1 and 2 seconds. **Reconnect feed** starts a new attempt when the socket is disconnected.
+
+See the [WebSocket contract](docs/design-pipeline.md#prompt-08-market-feed-websocket) and [Prompt 08 results](docs/verification.md#prompt-08---market-feed-websocket).
+
+### Integrated live check
+
+During the separately authorized AAPL check, the opt-in startup command from `backend/` is:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m uvicorn app.main:create_live_app --factory --host 127.0.0.1 --port 8000 --timeout-graceful-shutdown 5
+```
+
+Run a single backend process for this mode. It opens one AAPL subscription and uses the ignored SQLite database for history and new observations. The chart can show the observation ID, source time, and receipt time alongside the resulting candle. The integrated check must match those values against the stored observation and the WebSocket message. Actual live receipt remains pending. See the [live check evidence requirements](docs/design-pipeline.md#integrated-live-check).
 
 ### Initialize the local observation database
 

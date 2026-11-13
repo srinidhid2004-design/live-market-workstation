@@ -57,6 +57,7 @@ def aggregate_minutes(
         raise ValueError("Evaluation time must be timezone-aware UTC.")
     width = INTERVAL_MINUTES[interval] * MINUTE
     calendar = session_calendar()
+    first_date, last_date = calendar.first_session.date(), calendar.last_session.date()
     sessions: dict[date, tuple[datetime, datetime] | None] = {}
     seen: set[datetime] = set()
     groups: dict[tuple[datetime, datetime], list[CandleData]] = {}
@@ -70,6 +71,8 @@ def aggregate_minutes(
             raise ValueError("Each source minute must have a single current candle.")
         seen.add(stamp)
         session_date = stamp.date()
+        if not first_date <= session_date <= last_date:
+            continue
         if session_date not in sessions:
             label = session_date.isoformat()
             if calendar.is_session(label):
