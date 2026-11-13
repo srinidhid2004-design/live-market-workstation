@@ -8,7 +8,7 @@ The Prompt 3 HTTP check returned three ordered candles. Each field matched the i
 
 Prompt 4 adds a Vue chart for the synthetic practice path. The component fetches `/api/history` through Vite and converts each ISO UTC timestamp to Unix seconds for both Lightweight Charts series. The price candlesticks and volume histogram share a time scale in two stacked panes. The crosshair and keyboard-accessible selector both update the selected candle's UTC date, time, OHLC values, and volume. The panel labels the source as a synthetic one-minute sample and includes the TradingView attribution.
 
-The live Part 4.1 pipeline below remains planned. The synthetic CSV provides no evidence of Yahoo Finance connectivity. SQLite persistence, market-data WebSockets, and replay remain future work.
+Prompt 05 installed and verified yfinance 1.8.0 and websockets 17.4 for the credential-free Python subscription. The restricted project shell failed to resolve `streamer.finance.yahoo.com` with Windows error 11001. The separate normal-PowerShell probe resolved DNS, opened the WebSocket, and subscribed only to AAPL. It reached its 25-second bound without a qualifying update, so price, source time, receipt time, and volume remain unobserved. The chart continues to use the synthetic CSV. The live Part 4.1 pipeline below remains planned, and final Assignment 4.1 evidence requires another receipt check during active market conditions. See the [bounded check evidence](verification.md#prompt-05---bounded-aapl-check).
 
 ```text
 [Yahoo Finance live stream, AAPL]

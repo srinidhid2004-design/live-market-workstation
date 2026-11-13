@@ -3,3 +3,5 @@ uvicorn==0.54.0
 pydantic==2.14.3
 # Backend verification only (unittest uses HTTPX's ASGI transport).
 httpx==0.28.1
+yfinance==1.8.0
+websockets==17.4

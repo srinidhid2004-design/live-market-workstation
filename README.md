@@ -22,11 +22,11 @@ Prompt 01 established the project structure. Student-added Prompt 01a covers gov
 | Backend | Python with type hints | Python 3.14.7 runs directly. The Windows `python` and `py` aliases failed in the project shell. |
 | API transport | FastAPI HTTP and WebSocket routes, served by Uvicorn | FastAPI 0.162.5 and Uvicorn 0.54.0 import in the local environment. The implemented HTTP routes are `/api/health` and `/api/history`. |
 | Storage | Python standard-library `sqlite3` | SQLite 3.50.4 passed an in-memory write/read check. |
-| Market feed | Yahoo Finance via yfinance | yfinance did not import. The planned subscription uses no Yahoo credentials. |
+| Market feed | Yahoo Finance via yfinance | `yfinance==1.8.0` and `websockets==17.4` import in `backend/.venv`. The normal-PowerShell AAPL probe resolved DNS and opened the WebSocket. It timed out after 25 seconds without a qualifying update. |
 | Frontend | Vue 3 single-file components with the Composition API, Vite for local development, and TradingView Lightweight Charts | Node.js 24.20.0 and npm 11.19.0 run. The Vue, Vite, and Lightweight Charts 5.3.0 pins are in `frontend/package.json`. |
-| Package tools | pip for Python and npm for the frontend | pip 26.2.1 and both dependency locks are verified. The student completed the npm install from the official registry in normal PowerShell. |
+| Package tools | pip for Python and npm for the frontend | pip 26.2.1 runs in the existing environment. The student completed the npm install from the official registry in normal PowerShell. The 36-pin Python lock was checked against the approved resolution. |
 
-The approved Python environment is `backend/.venv`, created from CPython 3.14.7. The student installed the locked wheels through official PyPI in normal PowerShell. HTTPX is used only by the backend `unittest` tests. See [verification](docs/verification.md) for the setup evidence.
+The approved Python environment is `backend/.venv`, created from CPython 3.14.7. The student completed the locked wheel installation through official PyPI in normal PowerShell. All 36 application pins match the installed distributions, and `pip check` passes. HTTPX is used only by the backend `unittest` tests. See [verification](docs/verification.md) for the setup evidence.
 
 ## Run locally
 
@@ -42,9 +42,13 @@ For a clean checkout on Windows, create the Python environment with the local CP
 ```powershell
 $projectPython = Join-Path $env:LOCALAPPDATA 'Python\pythoncore-3.14-64\python.exe'
 & $projectPython -m venv --without-scm-ignore-files .\backend\.venv
-& .\backend\.venv\Scripts\python.exe -m pip install --only-binary=:all: --no-cache-dir --disable-pip-version-check -r .\backend\requirements.lock.txt
+& .\backend\.venv\Scripts\python.exe -B -m pip --isolated --disable-pip-version-check install --only-binary=:all: --no-cache-dir --index-url https://pypi.org/simple --timeout 5 --retries 0 -r .\backend\requirements.lock.txt
 & .\backend\.venv\Scripts\python.exe -m pip check
 ```
+
+For an existing environment, keep `backend/.venv` and run only the pip commands above in normal PowerShell if installation is needed.
+
+Prompt 05 confirmed Yahoo Finance WebSocket connectivity in normal PowerShell. An earlier attempt in the restricted project shell failed at DNS resolution. Live AAPL receipt remains unverified. Final Assignment 4.1 evidence requires a separate live-receipt check during active market conditions. See the [Prompt 05 verification record](docs/verification.md#prompt-05---bounded-aapl-check).
 
 ### Connection verification
 

@@ -365,3 +365,58 @@ Added an inline 32 × 32 SVG favicon to `frontend/index.html`. The explicit icon
 | Installed Chrome with the production bundle and intercepted fixture responses | Chrome decoded the inline favicon as 32 × 32 and showed close 101 and volume 850 shares at 14:31 UTC. Chrome recorded no `/favicon.ico` request, page error, or console error during this check. |
 | ESLint and production build | Lint passed with zero warnings. The build passed with 19 modules transformed. |
 | Git and service cleanup | `git diff --check` passed. The final listener check found no listeners on ports 8000 and 5173. |
+
+## Prompt 05 - Yahoo Finance dependencies
+
+Preflight found a clean `feature/assignment-4-part-1` at `c769901`, `main` at `474573e81efca7b4921cd602f4dee7803f804f36`, an empty index, and no remote. The existing `backend/.venv` uses CPython 3.14.7 and pip 26.2.1. The original 17 application pins matched the installed distributions, and `pip check` passed.
+
+The student reported a successful binary-only dry run from official PyPI in normal PowerShell and approved its 19 exact additions. Added `yfinance==1.8.0` and `websockets==17.4` to the declaration. The updated lock contains all 36 pins, including the original 17 at their existing versions.
+
+Run the following from the project root in normal PowerShell to install the approved lock into the existing environment. The expected result is 36 matching application distributions, with the original 17 retained.
+
+```powershell
+.\backend\.venv\Scripts\python.exe -B -m pip --isolated --disable-pip-version-check install --only-binary=:all: --no-cache-dir --index-url https://pypi.org/simple --timeout 5 --retries 0 -r .\backend\requirements.lock.txt
+```
+
+| Check | Observed result |
+| --- | --- |
+| Binary-only install from the complete lock | The single project-shell attempt exited 1. pip returned `No matching distribution found for beautifulsoup4==4.15.0` with no candidates. A DNS check for `pypi.org` returned Windows error 11001. No second install was attempted. |
+| Installed inventory and `pip check` | `pip list --format=freeze` matched the original 17 application pins after the failed attempt. `pip check` reported `No broken requirements found.` |
+| `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_history.py -k HistoryLoaderTest -v` from `backend/` | All nine loader tests passed in 0.120 seconds. |
+| Direct Python handler checks | The health handler produced `{"status":"healthy"}`. The history handler produced three ordered synthetic candles with the exact 14:31 UTC row, including close 101 and volume 850. |
+
+### Prompt 05 - Bounded AAPL check
+
+The student completed the locked binary wheel installation in normal PowerShell. The project interpreter was confirmed as `backend/.venv/Scripts/python.exe` with CPython 3.14.7 and pip 26.2.1. `importlib.metadata.distributions()` matched all 36 application pins by normalized package name and exact version. `from yfinance import WebSocket` succeeded, the imported versions were yfinance 1.8.0 and websockets 17.4, and `python -B -m pip --disable-pip-version-check check` reported `No broken requirements found.`
+
+The complete backend discovery command, `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v` from `backend/`, reached a 20-second deadline with the default Windows asyncio loop. An initial diagnostic runner using a named pipe also failed to start the async tests successfully. The successful process-local runner replaced the loop's TCP wake-up socket with short polling for queued callbacks and ran discovery on a worker thread. This ran all 12 existing tests, including the in-process ASGI route tests, without editing tests or application code. All 12 passed in 0.690 seconds before the network check and in 0.236 seconds afterward. Use the standard discovery command in normal PowerShell.
+
+#### Restricted project shell attempt
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| `netstat.exe -ano -p tcp` before the probe | No listeners on 8000 or 5173 | Both ports were free. |
+| `.\backend\.venv\Scripts\python.exe -B -` from the project root, with the one-shot probe supplied on stdin | Call `yfinance.WebSocket(verbose=False).subscribe("AAPL")` once and listen for one qualifying AAPL update | The one connection attempt started at `2026-11-13T04:40:16.275599Z` and ended at `2026-11-13T04:40:16.280076Z`. DNS resolution for `streamer.finance.yahoo.com` failed with `gaierror` 11001. The WebSocket never opened. The subscription could not be sent. Live receipt remains unverified. |
+| Probe bounds and output | Five-second handshake timeout, 20-second receive deadline measured from probe start, two-second close timeout, and a 28-second worker watchdog. No retry or redirect follow-up. Emit only normalized evidence. | The attempt ended before any timeout. No price, provider timestamp, receipt timestamp, or volume was observed. There was no payload to retain or print. |
+| Probe cleanup and `netstat.exe -ano -p tcp` afterward | Probe process exits, with no probe TCP entries or project port listeners | The worker exited. No probe TCP entries or listeners on 8000 or 5173 remained. |
+
+#### Separately authorized normal-PowerShell attempt
+
+The student ran the approved one-shot probe from the project root in normal PowerShell using `.\backend\.venv\Scripts\python.exe -B -`. The command used yfinance's synchronous WebSocket client, one AAPL-only subscription, a 25-second overall bound, and no retries. The exact output was:
+
+```json
+{"outcome": "timeout", "dns_resolved": true, "websocket_opened": true, "ticker": "AAPL"}
+```
+
+DNS resolution for `streamer.finance.yahoo.com` succeeded and the Yahoo Finance WebSocket opened. No qualifying AAPL update arrived within the bound. No price, source timestamp, backend receipt timestamp, or volume was observed. Live market-data receipt remains unverified. No retry was made. Final Assignment 4.1 evidence still requires a separately approved receipt check during active market conditions.
+
+#### Final regression and cleanup
+
+| Check | Observed result |
+| --- | --- |
+| Installed lock and `pip check` | All 36 pinned distributions matched `backend/.venv`. `yfinance==1.8.0`, `websockets==17.4`, and the WebSocket import were verified. pip reported `No broken requirements found.` |
+| Complete backend discovery | All 12 tests passed in 0.280 seconds with the process-local asyncio runner described above. |
+| `npm.cmd --prefix frontend run lint` | ESLint passed with zero warnings. |
+| `npm.cmd --prefix frontend run build` | Vite 7.3.8 built the production bundle and transformed 19 modules. |
+| Process and TCP cleanup | `Get-Process` found no running Python or Node processes. `netstat.exe -ano -p tcp` found no project listeners on 8000 or 5173 and no remaining probe connection. |
+| `git check-ignore` and `git ls-files` | The virtual environment, dependencies, caches, build output, and local test artifacts remain ignored and untracked. |

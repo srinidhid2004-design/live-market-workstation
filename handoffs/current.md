@@ -2,21 +2,25 @@
 
 ## Checkpoint
 
-Prompts 2 and 3 were verified and committed at `0954655` and `c683818`. Prompt 4 adds a synthetic candlestick and volume chart to the existing Vue app. The student reported that the running-app SmokeTest reached the end of the chart, health, outage, and recovery flow, with a favicon 404 as the sole console failure. An inline favicon now passes the isolated Chrome check. Lint and the production build passed, and ports 8000 and 5173 had no listeners after cleanup. The complete post-fix SmokeTest still needs normal PowerShell with loopback access. See [verification](../docs/verification.md#prompt-4-autoloop---favicon-console-error).
+Prompt 05's normal-PowerShell installation is complete. All 36 pins match `backend/.venv`, including yfinance 1.8.0 and websockets 17.4. The WebSocket import and `pip check` passed. The restricted project shell failed Yahoo hostname resolution with Windows error 11001. The separately authorized normal-PowerShell probe resolved DNS, opened the Yahoo Finance WebSocket, and subscribed only to AAPL. It timed out within the 25-second bound without a qualifying update or a retry. Price, source and receipt times, and volume were unobserved. Live receipt remains unverified. See the [bounded check evidence](../docs/verification.md#prompt-05---bounded-aapl-check).
 
-## Files and checks
+Final verification passed all 12 backend tests with the process-local asyncio runner, frontend ESLint with zero warnings, and the production build. Ports 8000 and 5173 were free and the Yahoo probe had exited. The virtual environment and generated artifacts remain ignored and untracked.
+
+The active branch `feature/assignment-4-part-1` is at `c769901`, with `main` at `474573e`. The index is empty and there is no remote. Prompts 2 and 3 were verified and committed at `0954655` and `c683818`. Prompt 4's committed chart uses the synthetic CSV. Its isolated Chrome favicon check, lint, and build passed. The complete post-fix running-app SmokeTest still needs normal PowerShell with loopback access. See the [Prompt 4 verification](../docs/verification.md#prompt-4-autoloop---favicon-console-error).
+
+## Foundation files and checks
 
 - Created `README.md`, `AGENTS.md`, `docs/design-pipeline.md`, `docs/verification.md`, `handoffs/create-handoff.md`, and this handoff. Created empty `backend/` and `frontend/` directories.
 - Copied the 20 numbered instructor prompts into `prompts/` and the synthetic sample into `prompts/data/sample-candles.csv`. All 21 SHA-256 hashes matched the archive. The numbered files are the originals.
 - Confirmed the starting root was empty and outside Git. Verified the Windows tools, discovered a working base Python 3.14.7 despite the failed shell aliases, and verified SQLite with an in-memory round trip. Node.js, npm, npx, pip, and Corepack ran. No project-configured Python environment, dependency manifests, or lockfiles were found. See [verification](../docs/verification.md) for missing packages and exact checks.
 - The final tree contained 27 files. The six new documents were nonempty, their file links resolved, and a second hash comparison confirmed the starter materials still matched the archive.
 - Prompt 01a added `.gitignore`, [AI-USE.md](../AI-USE.md), and the student-added [governance prompt](../prompts/01a-project-governance-and-version-control.md). Updated the README, project instructions, design notes, verification log, and this handoff. The application directories remain empty and no project dependencies are installed.
-- The foundation is committed at `474573e`. The active branch `feature/assignment-4-part-1` points to `c683818`, and `main` remains at `474573e`. There are no staged changes or configured remotes.
+- The foundation is committed at `474573e`.
 - The approved dry run failed to resolve the PyPI hostname. Setup stopped with no Python lockfile, application source, frontend manifest, or running project services. See [verification](../docs/verification.md) for the command and exact error.
 
 ## Outstanding decisions and next task
 
-- Run `npm.cmd --prefix .\frontend run test:connection` from the project root in normal PowerShell with ports 8000 and 5173 free. Review the Prompt 4 changes and end-to-end evidence before authorizing a commit. Live Yahoo Finance connectivity, SQLite persistence, market-data WebSockets, and replay remain pending.
+- Obtain separate approval for an AAPL receipt check during active market conditions to collect final Assignment 4.1 evidence. SQLite persistence, market-data WebSockets, and replay remain pending.
 - Later design decisions include the candle interval and completion rule, stale-data threshold, provider volume mapping, replay order and pacing, and SQLite runtime file location. Keep the course disclosure current as tools or models change.
 
 ## Prompt 2A connectivity retry
