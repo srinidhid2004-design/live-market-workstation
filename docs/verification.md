@@ -96,3 +96,98 @@ Checkpoint date: 2026-11-12 (Eastern time). This student-added checkpoint docume
 | `git --no-optional-locks status --short --branch --untracked-files=all`, `git ls-files --stage`, and `git diff --cached --check` | Verify the complete staged candidate and check its whitespace | The status showed 30 untracked files and zero staged files. The cached diff check exited successfully on the empty index. The staged content, hash, and whitespace checks require a populated index. |
 
 The checkpoint used local inspection, documentation edits, and Git commands. It created no application source, environment, dependency, runtime database, or network service and made no live Yahoo Finance request. Staging and verification of the populated index remain pending. Instructor Prompt 2 is the next implementation task after student authorization.
+
+## Prompt 2 - Local Vue–FastAPI connection
+
+Checkpoint date: 2026-11-12 (Eastern time). The student approved the exact package pins and project-local Python environment.
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| Git branch, revision, status, and remotes | Clean `feature/assignment-4-part-1` at `474573e`, matching `main`, with zero remotes | Passed before setup. Both refs still point to `474573e` and the index is empty of staged changes. |
+| Approved CPython executable with `-m venv --without-scm-ignore-files .\backend\.venv` | Project-local CPython 3.14.7 environment | Created successfully. The environment contains only bundled pip 26.2.1, and Git ignores it. |
+| Binary-only dry run below | Resolve the approved packages and write a report inside the ignored environment | Exit 1. PyPI DNS resolution failed with `[Errno 11001] getaddrinfo failed`. pip then reported `No matching distribution found for fastapi==0.162.5` after receiving no package candidates. The report and lockfile were not created. Compatibility and dependency resolution remain unverified. |
+| Check ports with `netstat -ano -p TCP` | No listeners on ports 8000 and 5173 following the setup stop | No listeners found on either port. |
+
+```powershell
+$venvPython = '.\backend\.venv\Scripts\python.exe'
+& $venvPython -m pip install --dry-run --ignore-installed --only-binary=:all: --no-cache-dir --disable-pip-version-check --report .\backend\.venv\resolve.json -r .\backend\requirements.txt
+```
+
+Resume at the dry run once PyPI is reachable from the project shell. Then inspect the report and generate the Python lock before installing. Backend imports, `pip check`, the focused health test, npm resolution, lint, build, Playwright, production audit, and all HTTP and browser evidence remain pending. This attempt made no live market-data request.
+
+### Prompt 2A - Bounded PyPI connectivity retry
+
+Verified the expected worktree changes, empty index, feature branch and `main` at `474573e`, and unchanged instructor prompts. The existing environment reported CPython 3.14.7 and only `pip==26.2.1`. The four approved direct pins matched and ports 8000 and 5173 had no listeners.
+
+The single probe attempted to resolve `pypi.org` with Python's `socket.getaddrinfo`, expecting DNS resolution followed by HTTP 200 from the official FastAPI metadata endpoint. DNS returned `gaierror` (Windows error 11001), so the probe skipped HTTPS. The dry run, lock generation, package installation, and application verification remain pending.
+
+### Prompt 2B - Python verification and connection implementation
+
+The explicitly authorized normal PowerShell installation used official PyPI after the project shell's DNS failures. The student reported that DNS succeeded and the official FastAPI 0.162.5 metadata endpoint returned HTTP 200. The project shell verified the resulting files and environment locally.
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| Compare `backend/requirements.txt`, `backend/requirements.lock.txt`, the ignored resolution report, and installed metadata | Four approved direct pins, 17 resolved wheels, and no unexpected installed packages | All 17 installed application and test dependencies match the lock. The report lists wheels from the official PyPI file host, including Pydantic Core's CPython 3.14 Windows x64 wheel. Bundled pip remains 26.2.1. |
+| Python version, imports, and `pip check` in `backend/.venv` | CPython 3.14.7, approved FastAPI/Uvicorn/Pydantic/HTTPX versions, consistent requirements | Passed. `pip check` reported `No broken requirements found.` |
+| `python -B -m unittest discover -s tests -v` from `backend/`, using the local environment | Health test asserts HTTP 200, JSON content type, and exact body | The test started but produced no result before it was interrupted. It must be rerun. |
+| `node --check` on the five frontend JavaScript files | Parse the entry point, configs, and browser test | All five passed. Vue compilation and lint are pending. |
+| Approved npm install command in README | Resolve exact frontend pins and create `package-lock.json` | One attempt exited 1. DNS returned `getaddrinfo ENOTFOUND registry.npmjs.org` while requesting `@playwright/test`. The manifest and source are present. No lockfile or dependency directory was created. npm wrote its diagnostic log inside the ignored project cache. |
+| Git and port checks | Same feature branch and baseline, empty index, no remote, ports 8000 and 5173 unused | Passed. No development server or browser was launched. |
+
+Resume by running the README's npm installation command in normal PowerShell. Then run the backend test, frontend lint, build, production-only audit, and installed-Chrome SmokeTest. Direct and proxied response bodies, outage and recovery, and console results remain pending.
+
+### Prompt 2 AutoLoop - Verification after manual npm installation
+
+The student reported that the official npm registry returned HTTP 200, normal PowerShell installed 131 packages, and the production-only audit reported zero vulnerabilities. This checkpoint checked the resulting lock and local packages without making registry requests.
+
+The seven direct pins matched the manifest, lockfile, and installed package metadata: `vue@3.5.44`, `vite@7.3.8`, `@vitejs/plugin-vue@6.0.4`, `eslint@9.39.5`, `eslint-plugin-vue@10.8.0`, `vue-eslint-parser@10.4.0`, and `@playwright/test@1.64.1`.
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| Compare Python lock and installed metadata, import FastAPI/Uvicorn/Pydantic/HTTPX, and run `pip check` | 17 locked packages plus pip 26.2.1 on CPython 3.14.7, with consistent dependencies | All pins matched, all four imports passed, and pip reported `No broken requirements found.` |
+| `node_modules\.bin\esbuild.cmd --version` | Installed esbuild executable runs | Exit 0, version 0.28.2, matching the JavaScript API version. The reported `node install.js` post-install script remains unapproved. |
+| `npm.cmd run lint` | ESLint exits 0 with zero warnings | Passed. The npm support-window warning for ESLint 9.39.5 is an installation warning and did not affect lint. |
+| `npm.cmd run build` | Vite exits 0 and produces `dist/` | Passed with Vite 7.3.8, 10 modules transformed, and HTML, CSS, and JavaScript produced. The build succeeded with the esbuild post-install script unapproved. |
+| Focused backend unittest with a 12-second `faulthandler` deadline | Assert status 200, JSON content type, and exact response bytes | Timed out before reaching the test body. The stack stopped in Windows asyncio's self-pipe setup at `socket._fallback_socketpair` → `accept`. A separate bounded Python loopback probe returned `PermissionError` with Windows error 10013. |
+| `npm.cmd run test:connection` | Vite becomes reachable, then installed Chrome verifies direct and proxied health, outage, recovery, and console | Playwright did not reach the browser assertions. The Vite web-server startup check did not become ready and the run was interrupted. A separate bounded Node loopback probe returned `EACCES` during connect. No HTTP response or browser console was observed. |
+| `netstat -ano -p TCP`, `git status --short --ignored=matching`, and staged/tracked path checks | Both ports released and generated paths ignored, with nothing staged | No listeners on 8000 or 5173 after the interrupted run. The Python environment, npm cache, dependency directory, and build output were ignored. The index contained no staged changes and no generated files were tracked. |
+
+AutoLoop ran one diagnostic pass and zero correction cycles. The backend hang occurred before application code ran, and independent Python and Node probes confirmed loopback access failures in the project shell. Application and test source were left as written. Run the focused backend test and the Chrome SmokeTest from normal PowerShell with loopback access to complete this checkpoint. The expected HTTP 200 body for both endpoints is `{"status":"healthy"}`.
+
+### Prompt 2C - Windows backend-stop assertion
+
+- Normal PowerShell backend unittest, as reported by the student. One test passed in 0.115 seconds with zero failures, including the exact response-body assertion.
+- First Chrome SmokeTest in normal PowerShell, as reported by the student. Uvicorn started. Both `http://127.0.0.1:8000/api/health` and `http://127.0.0.1:5173/api/health` returned HTTP 200 with the exact body `{"status":"healthy"}`. Chrome showed the pending and healthy states.
+- Immediately after the intentional backend stop, the direct request failed with `read ECONNRESET`. The assertion expected only `ECONNREFUSED`, so the run ended before the proxy outage, visible unavailable state, restart, recovery, and final console checks.
+- AutoLoop cycle 1 changed only the post-shutdown assertion to `/ECONN(?:REFUSED|RESET)/`. On Windows, a fresh connection to the stopped server can be refused, while a connection the client reuses can be reset. The pre-start refusal check and all later outage, recovery, console, and cleanup assertions remain intact.
+- `node --check frontend/tests/connection.spec.js` and `npm.cmd run lint` passed, with zero lint warnings. Playwright output paths are ignored. The restricted shell did not rerun the browser test. Full SmokeTest verification remains pending.
+
+From the project root in normal PowerShell, run `npm.cmd --prefix .\frontend run test:connection`.
+
+### Prompt 2D - Completed normal-PowerShell verification
+
+The backend and browser results below are the student's normal-PowerShell evidence. Final local checks used the installed dependencies without registry or loopback requests.
+
+| Check | Observed result |
+| --- | --- |
+| From `backend/`, run `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v` | `test_health_returns_exact_json` passed. One test ran in 0.115 seconds, result `OK`. The status, JSON content type, and exact response bytes matched. |
+| From the root, run `npm.cmd --prefix .\frontend run test:connection` | One test passed using installed Chrome, in 11.1 seconds total and 4.8 seconds for the test itself. |
+| Healthy path | Uvicorn started on `127.0.0.1:8000`. Both the direct `http://127.0.0.1:8000/api/health` and proxied `http://127.0.0.1:5173/api/health` requests returned HTTP 200 with the exact body `{"status":"healthy"}`. Chrome displayed the pending and healthy states. |
+| Intentional outage | The test stopped FastAPI. Vite returned HTTP 500 and logged the expected upstream `ECONNREFUSED` messages. Chrome displayed `Backend unavailable.` and omitted the healthy JSON. |
+| Recovery and console | The test restarted FastAPI. Both routes returned HTTP 200 and the exact healthy JSON again, and Chrome showed the healthy state. There were zero unexpected page or application-console errors and one expected failed-resource console error during the outage. |
+| Cleanup | The immediate Windows listing showed closed, FIN_WAIT, and briefly retained socket states. The later bounded listening-socket query found no listeners on ports 8000 and 5173. Its process-owner query therefore returned no processes. |
+| Local dependency checks | All 17 Python packages matched the lock, FastAPI/Uvicorn/Pydantic/HTTPX imports passed, and `pip check` reported no broken requirements. All seven approved frontend direct pins matched the manifest, lockfile, and installed tree. |
+| Local syntax, lint, and build | Three Python files compiled in memory, five JavaScript files passed `node --check`, and the Vue single-file component parsed. `npm.cmd run lint` passed with zero warnings, and `npm.cmd run build` passed with 10 modules transformed. |
+| esbuild and npm audit | The direct esbuild CLI returned 0.28.2. The production build passed with the reported `node install.js` post-install script still unapproved. The student's production-only npm audit reported zero vulnerabilities. npm's support-window warning for pinned ESLint 9.39.5 remains non-failing. |
+| Final workspace checks | `git diff --check` and the untracked-file whitespace scan passed. All 20 instructor prompts and the sample CSV matched the starter archive by SHA-256. The credential and private-path scans found no matches in 44 tracked or review-candidate files. No SQLite database or sidecar was found, and the local verification made no Yahoo Finance request. The environment, npm cache, dependency tree, build output, Playwright output, and logs were covered by ignore rules. No generated files were staged or tracked. A local port inventory confirmed zero listeners on 8000 and 5173. |
+| Final Git state | `feature/assignment-4-part-1` and `main` both point to `474573e`. There are no staged changes or remotes. The working tree has four modified documentation files and 14 untracked Prompt 2 files for review. |
+
+#### Failed approaches and revisions for the curated evidence log
+
+| Failed approach | Revision | Verified result |
+| --- | --- | --- |
+| Resolve PyPI and the npm registry from the restricted project shell. PyPI returned Windows DNS error 11001 and npm returned `ENOTFOUND`. | Use explicitly approved normal PowerShell sessions with official PyPI and npm. Retain the exact pins, binary-only Python lock, and npm lockfile. | Both installs succeeded. Local package metadata matched the locks and the approved direct pins. |
+| Run the loopback-dependent tests in the restricted shell. The Python event loop stalled at socket setup and the Vite readiness check could not connect. | Run the backend unittest and installed-Chrome SmokeTest in normal PowerShell with loopback access. | The backend test passed, and Chrome reached the direct and proxied HTTP endpoints. |
+| Expect only `ECONNREFUSED` immediately after deliberately stopping FastAPI. Windows returned `read ECONNRESET`. | Allow exactly the refusal and reset error codes on the post-shutdown direct-request assertion. A new socket can be refused and a reused socket can be reset. Keep the proxy, browser, recovery, console, and cleanup assertions. | The corrected Chrome run passed the complete outage and recovery flow and released both listening ports. |
+
+Prompt 2 verifies local Vue–Vite–FastAPI HTTP connectivity. Yahoo Finance availability, live data, SQLite persistence, candlestick correctness, and WebSocket market streaming remain outside this checkpoint.

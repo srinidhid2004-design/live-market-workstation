@@ -1,6 +1,8 @@
 # Assignment 4.1 design pipeline
 
-The instructor prompts, three-row synthetic CSV, and Prompt 01a governance and [AI disclosure](../AI-USE.md) documents exist today. `backend/` and `frontend/` are empty and the project has no installed application dependencies. Assignment 4 is cumulative. The Part 4.1 pipeline below is the planned foundation for later Parts 4.2 and 4.3. [Instructor Prompt 2](../prompts/02-connect-vue-and-fastapi.md) is the next task.
+The instructor prompts, three-row synthetic CSV, and Prompt 01a governance and [AI disclosure](../AI-USE.md) documents exist today. [Instructor Prompt 2](../prompts/02-connect-vue-and-fastapi.md) verified the Vue button, Vite proxy on port 5173, and FastAPI route on port 8000 in installed Chrome. Both routes returned HTTP 200 and `{"status":"healthy"}` before and after the restart. The Vite proxy returned HTTP 500 during the intentional backend outage, and Vue displayed `Backend unavailable.`. See the [verification log](verification.md) for the console and shutdown results.
+
+Assignment 4 is cumulative. The market-data pipeline below remains planned for Part 4.1. The health check verifies local HTTP transport. Live Yahoo Finance availability, persistence, candle correctness, and WebSocket delivery require their own evidence.
 
 ```text
 [Yahoo Finance live stream, AAPL]
